@@ -1,0 +1,98 @@
+import React from 'react';
+const navItems = [
+  { icon: "⊞", label: "Dashboard" },
+  { icon: "⊕", label: "Browse Projects" },
+  { icon: "✦", label: "Post Project" },
+  { icon: "◉", label: "Profile", active: true },
+  { icon: "→", label: "Logout" },
+];
+
+export default function Sidebar({ open, setOpen }) {
+  return (
+    <aside
+      style={{
+        width: open ? 220 : 68,
+        background: '#fff',
+        borderRight: '1px solid #ede9fe',
+        padding: '28px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        transition: 'width 0.25s',
+        overflow: 'hidden',
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        height: '100vh',
+        zIndex: 10,
+      }}
+    >
+      {/* Logo */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '0 6px 20px',
+          borderBottom: '1px solid #f1f0ff',
+          marginBottom: 8,
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontSize: 16,
+            fontWeight: 800,
+            flexShrink: 0,
+          }}
+        >
+          S
+        </div>
+        {open && (
+          <span
+            style={{
+              fontFamily: "'Sora', sans-serif",
+              fontWeight: 800,
+              fontSize: 13,
+              color: '#4f46e5',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            SkillExchange
+          </span>
+        )}
+      </div>
+
+      {/* Nav Items */}
+      {navItems.map((item) => (
+        <div
+          key={item.label}
+          className={`nav-item${item.active ? ' active' : ''}`}
+          title={item.label}
+        >
+          <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
+          {open && <span style={{ whiteSpace: 'nowrap' }}>{item.label}</span>}
+        </div>
+      ))}
+
+      {/* Collapse Toggle */}
+      <div style={{ marginTop: 'auto' }}>
+        <div
+          className="nav-item"
+          onClick={() => setOpen(!open)}
+          title="Toggle Sidebar"
+        >
+          <span style={{ fontSize: 18 }}>{open ? '◀' : '▶'}</span>
+          {open && <span>Collapse</span>}
+        </div>
+      </div>
+    </aside>
+  );
+}
