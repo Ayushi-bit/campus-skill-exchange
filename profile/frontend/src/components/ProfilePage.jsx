@@ -104,7 +104,7 @@ export default function ProfilePage({ onNavigate }) {
           <ProfileHeader user={profileData.user} onEditClick={() => setIsEditing(true)} />
           <AboutSection bio={profileData.user.bio} skills={profileData.skills} user={profileData.user} />
           <AnalyticsSection analytics={profileData.analytics} />
-          <ProjectsSection projects={profileData.projects} />
+          <ProjectsSection projects={profileData.projects} onNavigate={onNavigate} />
           <ReviewsSection reviews={profileData.reviews} />
         </main>
       )}

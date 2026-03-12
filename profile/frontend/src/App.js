@@ -1,24 +1,47 @@
 // ============================================================
-//  APP.JS — Simple page router (Dashboard ↔ Profile)
+//  APP.JS — Page router
 //  File: src/App.js
-//  Replace with React Router later when more pages are added
 // ============================================================
 
 import React, { useState } from 'react';
-import DashboardPage from './components/DashboardPage';
-import ProfilePage   from './components/ProfilePage';
+import DashboardPage      from './components/DashboardPage';
+import ProfilePage        from './components/ProfilePage';
+import ProjectDetailPage  from './components/ProjectDetailPage';
+import BrowseProjectsPage from './components/BrowseProjectsPage';
+import PostProjectPage    from './components/PostProjectPage';
 
 export default function App() {
-  const [page, setPage] = useState('dashboard');
+  const [page,      setPage]      = useState('dashboard');
+  const [projectId, setProjectId] = useState(null);
+  // Track where the user came from so Back works correctly
+  const [prevPage,  setPrevPage]  = useState('dashboard');
 
-  const navigate = (dest) => {
-    if (dest === 'dashboard') setPage('dashboard');
-    if (dest === 'profile')   setPage('profile');
-    // Other pages (browse, post, etc.) will be added later
+  const navigate = (dest, id = null) => {
+    if (dest === 'project' && id) {
+      setPrevPage(page);      // remember where we came from
+      setProjectId(id);
+      setPage('project');
+      return;
+    }
+    setPage(dest);
   };
 
-  if (page === 'profile')   return <ProfilePage   onNavigate={navigate} />;
-  if (page === 'dashboard') return <DashboardPage onNavigate={navigate} />;
+  const goBack = () => {
+    setPage(prevPage);
+    setProjectId(null);
+  };
+
+  if (page === 'dashboard') return <DashboardPage      onNavigate={navigate} />;
+  if (page === 'profile')   return <ProfilePage         onNavigate={navigate} />;
+  if (page === 'browse')    return <BrowseProjectsPage  onNavigate={navigate} />;
+  if (page === 'post')      return <PostProjectPage     onNavigate={navigate} />;
+  if (page === 'project')   return (
+    <ProjectDetailPage
+      projectId={projectId}
+      onNavigate={navigate}
+      onBack={goBack}
+    />
+  );
 
   return (
     <div style={{

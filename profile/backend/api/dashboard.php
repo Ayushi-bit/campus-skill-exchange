@@ -77,20 +77,23 @@ $fields = [
 $filled = count(array_filter($fields, fn($v) => !empty($v) && $v !== 'Not Set'));
 $completion = (int) round(($filled / count($fields)) * 100);
 
-// ── 3. ACTIVE PROJECTS (posted by user, open or in_progress) ──
+// ── 3. ACTIVE PROJECTS (projects user posted OR joined) ──
 $stmt = $conn->prepare("
-    SELECT p.id, p.title, p.status, p.max_members, p.created_at,
+    SELECT DISTINCT p.id, p.title, p.status, p.max_members, p.created_at,
            d.name AS domain,
            (SELECT COUNT(*) FROM project_applications pa
             WHERE pa.project_id = p.id AND pa.status = 'pending') AS pending_applicants,
-           (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id) AS member_count
+           (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count
     FROM projects p
     JOIN domains d ON d.id = p.domain_id
-    WHERE p.posted_by = ? AND p.status IN ('open','in_progress')
+    LEFT JOIN project_members pm ON pm.project_id = p.id
+    WHERE (p.posted_by = ? OR pm.user_id = ?)
+    AND p.status IN ('open','in_progress')
     ORDER BY p.created_at DESC
     LIMIT 5
 ");
-$stmt->bind_param("i", $user_id);
+
+$stmt->bind_param("ii", $user_id, $user_id);
 $stmt->execute();
 $res = $stmt->get_result();
 $activeProjects = [];
@@ -110,8 +113,8 @@ $stmt->close();
 
 // ── 4. MY APPLICATIONS ────────────────────────────────────
 $stmt = $conn->prepare("
-    SELECT p.title, d.name AS domain, pa.status, pa.applied_at,
-           u.name AS owner_name
+    SELECT p.id, p.title, d.name AS domain, pa.status, pa.applied_at,
+       u.name AS owner_name
     FROM project_applications pa
     JOIN projects p ON p.id = pa.project_id
     JOIN domains d ON d.id = p.domain_id
@@ -126,12 +129,13 @@ $res = $stmt->get_result();
 $myApplications = [];
 while ($r = $res->fetch_assoc()) {
     $myApplications[] = [
-        "title"      => $r['title'],
-        "domain"     => $r['domain'],
-        "status"     => ucfirst($r['status']),
-        "owner_name" => $r['owner_name'],
-        "date"       => date("M j, Y", strtotime($r['applied_at'])),
-    ];
+    "id"         => (int) $r['id'],
+    "title"      => $r['title'],
+    "domain"     => $r['domain'],
+    "status"     => ucfirst($r['status']),
+    "owner_name" => $r['owner_name'],
+    "date"       => date("M j, Y", strtotime($r['applied_at'])),
+];
 }
 $stmt->close();
 

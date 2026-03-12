@@ -1,6 +1,7 @@
 // ============================================================
 //  DASHBOARD PAGE  — Activity & Control Center
 //  File: src/components/DashboardPage.jsx
+//  CHANGE: project cards are now clickable → navigate('project', id)
 // ============================================================
 
 import React, { useEffect, useState } from 'react';
@@ -78,7 +79,6 @@ export default function DashboardPage({ onNavigate }) {
   const pendingCount = my_applications.filter(a => a.status === 'Pending').length;
   const unreadCount  = recent_activity.filter(a => !a.is_read).length;
 
-  // Dynamic summary line
   const parts = [];
   if (active_projects.length > 0)
     parts.push(`${active_projects.length} active project${active_projects.length !== 1 ? 's' : ''}`);
@@ -94,62 +94,36 @@ export default function DashboardPage({ onNavigate }) {
 
       <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', maxWidth: 960 }}>
 
-        {/* ══════════════════════════════════════════════
-            1. WELCOME BANNER
-            Dark indigo — compact, action-oriented.
-            No avatar, no email — just greeting + summary
-            + action buttons. Feels like a control panel.
-            ══════════════════════════════════════════════ */}
+        {/* WELCOME BANNER */}
         <div className="fade-up" style={{
           background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 60%, #4338ca 100%)',
           borderRadius: 20, padding: '24px 32px', color: '#fff',
           marginBottom: 24, position: 'relative', overflow: 'hidden',
           boxShadow: '0 4px 24px rgba(30,27,75,0.2)',
         }}>
-          {/* Hatched texture — distinct from profile's circles */}
           <div style={{
             position: 'absolute', right: -20, top: 0, bottom: 0,
             width: 260, opacity: 0.06, pointerEvents: 'none',
             backgroundImage: 'repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)',
             backgroundSize: '12px 12px',
           }} />
-
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              alignItems: 'flex-start', flexWrap: 'wrap', gap: 16,
-            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <div style={{
-                  fontFamily: "'Sora', sans-serif",
-                  fontSize: 20, fontWeight: 800, marginBottom: 4,
-                }}>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 800, marginBottom: 4 }}>
                   Welcome back, {firstName} 👋
                 </div>
                 <div style={{ fontSize: 13, opacity: 0.75 }}>{summaryLine}</div>
               </div>
-
-              {/* Profile completion pill — only if incomplete */}
               {stats.profile_completion < 100 && (
-                <button
-                  onClick={() => onNavigate && onNavigate('profile')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    background: 'rgba(255,255,255,0.1)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: 12, padding: '8px 16px',
-                    cursor: 'pointer', color: '#fff',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  <div style={{
-                    width: 70, height: 5,
-                    background: 'rgba(255,255,255,0.2)', borderRadius: 10,
-                  }}>
-                    <div style={{
-                      width: `${stats.profile_completion}%`, height: '100%',
-                      background: '#a5b4fc', borderRadius: 10,
-                    }} />
+                <button onClick={() => onNavigate && onNavigate('profile')} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: 12, padding: '8px 16px', cursor: 'pointer',
+                  color: '#fff', fontFamily: 'inherit',
+                }}>
+                  <div style={{ width: 70, height: 5, background: 'rgba(255,255,255,0.2)', borderRadius: 10 }}>
+                    <div style={{ width: `${stats.profile_completion}%`, height: '100%', background: '#a5b4fc', borderRadius: 10 }} />
                   </div>
                   <span style={{ fontSize: 12, opacity: 0.85, whiteSpace: 'nowrap' }}>
                     Profile {stats.profile_completion}% →
@@ -157,23 +131,15 @@ export default function DashboardPage({ onNavigate }) {
                 </button>
               )}
             </div>
-
-            {/* Action buttons */}
             <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-              <WelcomeBtn icon="✦" label="Post Project"    onClick={() => onNavigate && onNavigate('post')} />
+              <WelcomeBtn icon="✦"  label="Post Project"    onClick={() => onNavigate && onNavigate('post')} />
               <WelcomeBtn icon="🔍" label="Browse Projects" onClick={() => onNavigate && onNavigate('browse')} transparent />
             </div>
           </div>
         </div>
 
-        {/* ══════════════════════════════════════════════
-            2. QUICK STATS — activity metrics ONLY
-            No avg_rating here — that lives on Profile.
-            4th card = unread notifications (activity).
-            ══════════════════════════════════════════════ */}
-        <div className="fade-up" style={{
-          display: 'flex', gap: 14, marginBottom: 24, animationDelay: '0.05s',
-        }}>
+        {/* QUICK STATS */}
+        <div className="fade-up" style={{ display: 'flex', gap: 14, marginBottom: 24, animationDelay: '0.05s' }}>
           {[
             { icon: '📁', label: 'Projects Posted',   value: stats.projects_posted,    color: '#6366f1' },
             { icon: '📨', label: 'Applications Sent', value: stats.applications_sent,  color: '#d97706' },
@@ -182,80 +148,73 @@ export default function DashboardPage({ onNavigate }) {
           ].map(stat => (
             <div key={stat.label} className="stat-card">
               <div style={{ fontSize: 24, marginBottom: 8 }}>{stat.icon}</div>
-              <div style={{
-                fontFamily: "'Sora', sans-serif",
-                fontSize: 28, fontWeight: 800, color: stat.color,
-              }}>{stat.value}</div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontWeight: 500 }}>
-                {stat.label}
+              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 800, color: stat.color }}>
+                {stat.value}
               </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontWeight: 500 }}>{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* ══════════════════════════════════════════════
-            SPLIT LAYOUT — Primary (left) + Secondary (right)
-            Left  → main work area: projects + applications
-            Right → context panel:  activity + quick actions
-            Pattern used by GitHub, Linear, Notion dashboards
-            ══════════════════════════════════════════════ */}
+        {/* SPLIT LAYOUT */}
         <div className="fade-up" style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 360px',   /* left wider, right fixed */
-          gap: 20,
-          alignItems: 'start',                /* columns don't stretch to equal height */
-          animationDelay: '0.1s',
+          display: 'grid', gridTemplateColumns: '1fr 360px',
+          gap: 20, alignItems: 'start', animationDelay: '0.1s',
         }}>
 
-          {/* ── PRIMARY PANEL (left) — work area ─────── */}
+          {/* LEFT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            {/* Active Projects */}
+            {/* Active Projects — CLICKABLE */}
             <div className="card">
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', marginBottom: 16,
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div className="section-title" style={{ margin: 0 }}>My Active Projects</div>
                 <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
                   {active_projects.length} active
                 </span>
               </div>
-
               {active_projects.length === 0
                 ? <EmptyState icon="📂" text="No active projects" sub="Post a project to get started" />
                 : active_projects.map((p, i) => {
                     const sc = statusColors[p.status] || { bg: '#f3f4f6', color: '#6b7280' };
                     return (
-                      <div key={i} className="project-card" style={{
-                        background: '#fafafe', borderRadius: 14,
-                        padding: '14px 16px',
-                        marginBottom: i < active_projects.length - 1 ? 10 : 0,
-                        border: '1px solid #f1f0ff',
-                      }}>
-                        <div style={{
-                          display: 'flex', justifyContent: 'space-between',
-                          alignItems: 'flex-start', marginBottom: 6,
-                        }}>
-                          <span style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 14 }}>
-                            {p.title}
+                      <div
+                        key={i}
+                        onClick={() => onNavigate && onNavigate('project', p.id)}
+                        style={{
+                          background: '#fafafe', borderRadius: 14,
+                          padding: '14px 16px',
+                          marginBottom: i < active_projects.length - 1 ? 10 : 0,
+                          border: '1px solid #f1f0ff',
+                          cursor: 'pointer',
+                          transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.12)';
+                          e.currentTarget.style.borderColor = '#c7d2fe';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                          e.currentTarget.style.borderColor = '#f1f0ff';
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                          <span style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 14 }}>{p.title}</span>
+                          <span style={{ background: sc.bg, color: sc.color, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                            {p.status}
                           </span>
-                          <span style={{
-                            background: sc.bg, color: sc.color,
-                            borderRadius: 20, padding: '3px 10px',
-                            fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-                          }}>{p.status}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                          📂 {p.domain}
-                        </div>
-                        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#9ca3af' }}>
-                          <span>👥 {p.member_count}/{p.max_members} members</span>
-                          {p.pending_applicants > 0 && (
-                            <span style={{ color: '#d97706', fontWeight: 600 }}>
-                              📨 {p.pending_applicants} pending
-                            </span>
-                          )}
+                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>📂 {p.domain}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#9ca3af' }}>
+                            <span>👥 {p.member_count}/{p.max_members} members</span>
+                            {p.pending_applicants > 0 && (
+                              <span style={{ color: '#d97706', fontWeight: 600 }}>📨 {p.pending_applicants} pending</span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 500 }}>View →</span>
                         </div>
                       </div>
                     );
@@ -263,48 +222,50 @@ export default function DashboardPage({ onNavigate }) {
               }
             </div>
 
-            {/* My Applications */}
+            {/* My Applications — CLICKABLE */}
             <div className="card">
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', marginBottom: 16,
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div className="section-title" style={{ margin: 0 }}>My Applications</div>
                 <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
                   {my_applications.length} total
                 </span>
               </div>
-
               {my_applications.length === 0
                 ? <EmptyState icon="📋" text="No applications yet" sub="Browse projects and apply" />
                 : my_applications.map((a, i) => {
                     const sc = statusColors[a.status] || { bg: '#f3f4f6', color: '#6b7280' };
                     return (
-                      <div key={i} style={{
-                        background: '#fafafe', borderRadius: 14,
-                        padding: '14px 16px',
-                        marginBottom: i < my_applications.length - 1 ? 10 : 0,
-                        border: '1px solid #f1f0ff',
-                      }}>
-                        <div style={{
-                          display: 'flex', justifyContent: 'space-between',
-                          alignItems: 'flex-start', marginBottom: 6,
-                        }}>
-                          <span style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 14 }}>
-                            {a.title}
+                      <div
+                        key={i}
+                        onClick={() => a.id && onNavigate && onNavigate('project', a.id)}
+                        style={{
+                          background: '#fafafe', borderRadius: 14,
+                          padding: '14px 16px',
+                          marginBottom: i < my_applications.length - 1 ? 10 : 0,
+                          border: '1px solid #f1f0ff',
+                          cursor: a.id ? 'pointer' : 'default',
+                          transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
+                        }}
+                        onMouseEnter={e => {
+                          if (!a.id) return;
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(99,102,241,0.12)';
+                          e.currentTarget.style.borderColor = '#c7d2fe';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                          e.currentTarget.style.borderColor = '#f1f0ff';
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                          <span style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 14 }}>{a.title}</span>
+                          <span style={{ background: sc.bg, color: sc.color, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 600 }}>
+                            {a.status}
                           </span>
-                          <span style={{
-                            background: sc.bg, color: sc.color,
-                            borderRadius: 20, padding: '3px 10px',
-                            fontSize: 11, fontWeight: 600,
-                          }}>{a.status}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
-                          📂 {a.domain}
-                        </div>
-                        <div style={{ fontSize: 12, color: '#9ca3af' }}>
-                          by {a.owner_name} · {a.date}
-                        </div>
+                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>📂 {a.domain}</div>
+                        <div style={{ fontSize: 12, color: '#9ca3af' }}>by {a.owner_name} · {a.date}</div>
                       </div>
                     );
                   })
@@ -312,27 +273,19 @@ export default function DashboardPage({ onNavigate }) {
             </div>
           </div>
 
-          {/* ── SECONDARY PANEL (right) — context area ── */}
+          {/* RIGHT */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
             {/* Recent Activity */}
             <div className="card">
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', marginBottom: 16,
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div className="section-title" style={{ margin: 0 }}>Recent Activity</div>
                 {unreadCount > 0 && (
-                  <span style={{
-                    background: '#eef2ff', color: '#6366f1',
-                    borderRadius: 20, padding: '3px 10px',
-                    fontSize: 11, fontWeight: 600,
-                  }}>
+                  <span style={{ background: '#eef2ff', color: '#6366f1', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 600 }}>
                     {unreadCount} unread
                   </span>
                 )}
               </div>
-
               {recent_activity.length === 0
                 ? <EmptyState icon="🔔" text="No recent activity" sub="Notifications appear here" />
                 : recent_activity.map((act, i) => (
@@ -346,25 +299,19 @@ export default function DashboardPage({ onNavigate }) {
                       <div style={{
                         width: 32, height: 32, borderRadius: '50%',
                         background: 'linear-gradient(135deg, #ede9fe, #ddd6fe)',
-                        display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: 14, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 14, flexShrink: 0,
                       }}>
                         {activityIcon[act.type] || activityIcon.default}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          fontSize: 12, color: '#1e1b4b', margin: 0,
-                          fontWeight: act.is_read ? 400 : 600,
-                          lineHeight: 1.5,
-                          overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>{act.message}</p>
+                        <p style={{ fontSize: 12, color: '#1e1b4b', margin: 0, fontWeight: act.is_read ? 400 : 600, lineHeight: 1.5 }}>
+                          {act.message}
+                        </p>
                         <span style={{ fontSize: 11, color: '#9ca3af' }}>{act.date}</span>
                       </div>
                       {!act.is_read && (
-                        <div style={{
-                          width: 7, height: 7, borderRadius: '50%',
-                          background: '#6366f1', flexShrink: 0, marginTop: 5,
-                        }} />
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1', flexShrink: 0, marginTop: 5 }} />
                       )}
                     </div>
                   ))
@@ -381,25 +328,16 @@ export default function DashboardPage({ onNavigate }) {
                   { icon: '👤', label: 'Update Profile',     page: 'profile',       bg: '#f5f3ff', color: '#7c3aed' },
                   { icon: '🔔', label: 'View Notifications', page: 'notifications', bg: '#fffbeb', color: '#d97706' },
                 ].map(action => (
-                  <button
-                    key={action.label}
-                    onClick={() => onNavigate && onNavigate(action.page)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      background: action.bg, border: 'none', borderRadius: 12,
-                      padding: '11px 16px', cursor: 'pointer',
-                      color: action.color, fontWeight: 600, fontSize: 13,
-                      fontFamily: 'inherit', width: '100%', textAlign: 'left',
-                      transition: 'transform 0.15s, box-shadow 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = 'translateX(3px)';
-                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.07)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = 'translateX(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
+                  <button key={action.label} onClick={() => onNavigate && onNavigate(action.page)} style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    background: action.bg, border: 'none', borderRadius: 12,
+                    padding: '11px 16px', cursor: 'pointer',
+                    color: action.color, fontWeight: 600, fontSize: 13,
+                    fontFamily: 'inherit', width: '100%', textAlign: 'left',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(3px)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.07)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(0)';   e.currentTarget.style.boxShadow = 'none'; }}
                   >
                     <span style={{ fontSize: 15 }}>{action.icon}</span>
                     {action.label}
@@ -410,41 +348,27 @@ export default function DashboardPage({ onNavigate }) {
             </div>
 
           </div>
-          {/* ── end split layout ── */}
-
         </div>
-
       </main>
     </div>
   );
 }
 
-// ── Welcome banner action button ──────────────────────────
 function WelcomeBtn({ icon, label, onClick, transparent }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        background: hovered
-          ? 'rgba(255,255,255,0.25)'
-          : transparent ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.18)',
-        border: '1px solid rgba(255,255,255,0.25)',
-        color: '#fff', borderRadius: 10,
-        padding: '8px 18px', cursor: 'pointer',
-        fontWeight: 600, fontSize: 13, fontFamily: 'inherit',
-        transition: 'background 0.15s',
-      }}
-    >
+    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      background: hovered ? 'rgba(255,255,255,0.25)' : transparent ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.18)',
+      border: '1px solid rgba(255,255,255,0.25)', color: '#fff', borderRadius: 10,
+      padding: '8px 18px', cursor: 'pointer', fontWeight: 600, fontSize: 13,
+      fontFamily: 'inherit', transition: 'background 0.15s',
+    }}>
       <span>{icon}</span> {label}
     </button>
   );
 }
 
-// ── Empty state ───────────────────────────────────────────
 function EmptyState({ icon, text, sub }) {
   return (
     <div style={{ textAlign: 'center', padding: '24px 0' }}>

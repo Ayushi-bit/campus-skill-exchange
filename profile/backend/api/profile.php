@@ -127,6 +127,7 @@ while ($row = $res->fetch_assoc()) {
     $psStmt->close();
 
     $postedProjects[] = [
+        "id"     => (int) $row['id'],
         "title"  => $row['title'],
         "domain" => $row['domain'],
         "status" => ucfirst(str_replace('_', ' ', $row['status'])),
@@ -140,7 +141,7 @@ $stmt->close();
 // 5. FETCH PROJECTS — APPLIED
 // ──────────────────────────────────────────────
 $stmt = $conn->prepare("
-    SELECT p.title, d.name as domain, p.status, pa.applied_at
+    SELECT p.id, p.title, d.name as domain, p.status, pa.applied_at
     FROM project_applications pa
     JOIN projects p ON p.id = pa.project_id
     JOIN domains d ON d.id = p.domain_id
@@ -153,6 +154,7 @@ $res = $stmt->get_result();
 $appliedProjects = [];
 while ($row = $res->fetch_assoc()) {
     $appliedProjects[] = [
+        "id"     => (int) $row['id'],
         "title"  => $row['title'],
         "domain" => $row['domain'],
         "status" => ucfirst(str_replace('_', ' ', $row['status'])),
@@ -165,7 +167,7 @@ $stmt->close();
 // 6. FETCH PROJECTS — COMPLETED
 // ──────────────────────────────────────────────
 $stmt = $conn->prepare("
-    SELECT p.title, d.name as domain, p.status, pm.joined_at, pm.role
+    SELECT p.id, p.title, d.name as domain, p.status, pm.joined_at, pm.role
     FROM project_members pm
     JOIN projects p ON p.id = pm.project_id
     JOIN domains d ON d.id = p.domain_id
@@ -178,6 +180,7 @@ $res = $stmt->get_result();
 $completedProjects = [];
 while ($row = $res->fetch_assoc()) {
     $completedProjects[] = [
+        "id"     => (int) $row['id'],
         "title"  => $row['title'],
         "domain" => $row['domain'],
         "status" => "Completed",

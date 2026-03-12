@@ -7,7 +7,7 @@ const TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-export default function ProjectsSection({ projects }) {
+export default function ProjectsSection({ projects, onNavigate }) {
   const [activeTab, setActiveTab] = useState('posted');
 
   return (
@@ -48,7 +48,7 @@ export default function ProjectsSection({ projects }) {
         }}
       >
         {projects[activeTab].map((p, i) => (
-          <ProjectCard key={i} project={p} />
+          <ProjectCard key={i} project={p} onNavigate={onNavigate} />
         ))}
       </div>
     </div>
