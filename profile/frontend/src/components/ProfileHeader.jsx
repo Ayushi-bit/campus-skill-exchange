@@ -1,36 +1,26 @@
 // ============================================================
-//  PROFILE HEADER (Updated — Edit button triggers navigation)
+//  PROFILE HEADER — Identity Card
 //  File: src/components/ProfileHeader.jsx
+//  Keeps: avatar, name, email, domain, level, rating, edit btn
+//  This is the "personal card" — bigger and more personal
+//  than the Dashboard's compact welcome banner.
 // ============================================================
 
 import React from 'react';
 import StarRating from './StarRating';
 
 export default function ProfileHeader({ user, onEditClick }) {
-  const initials = user.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('');
+  const initials = user.name.split(' ').map(n => n[0]).join('');
 
   return (
-    <div
-      className="fade-up"
-      style={{
-        background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 60%, #a855f7 100%)',
-        borderRadius: 24,
-        padding: '32px 36px',
-        color: '#fff',
-        display: 'flex',
-        gap: 28,
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
-        marginBottom: 24,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Decorative circles */}
+    <div className="fade-up" style={{
+      background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 60%, #a855f7 100%)',
+      borderRadius: 24, padding: '32px 36px', color: '#fff',
+      display: 'flex', gap: 28, alignItems: 'center', flexWrap: 'wrap',
+      boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
+      marginBottom: 24, position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Decorative circles — distinct from Dashboard's hatched pattern */}
       <div style={{
         position: 'absolute', right: -40, top: -40,
         width: 180, height: 180, borderRadius: '50%',
@@ -42,7 +32,7 @@ export default function ProfileHeader({ user, onEditClick }) {
         background: 'rgba(255,255,255,0.05)',
       }} />
 
-      {/* Avatar */}
+      {/* Large avatar — identity element, not on Dashboard */}
       <div style={{
         width: 96, height: 96, borderRadius: '50%',
         background: 'rgba(255,255,255,0.2)',
@@ -55,7 +45,7 @@ export default function ProfileHeader({ user, onEditClick }) {
         {initials}
       </div>
 
-      {/* Info */}
+      {/* Name, email, domain badges */}
       <div style={{ flex: 1, minWidth: 180 }}>
         <div style={{
           fontFamily: "'Sora', sans-serif",
@@ -63,26 +53,24 @@ export default function ProfileHeader({ user, onEditClick }) {
         }}>
           {user.name}
         </div>
-        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>{user.email}</div>
+        <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 10 }}>
+          {user.email}
+        </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <span style={{
             background: 'rgba(255,255,255,0.18)', borderRadius: 20,
             padding: '4px 14px', fontSize: 12, fontWeight: 600,
             backdropFilter: 'blur(4px)',
-          }}>
-            {user.domain}
-          </span>
+          }}>{user.domain}</span>
           <span style={{
             background: 'rgba(255,255,255,0.18)', borderRadius: 20,
             padding: '4px 14px', fontSize: 12, fontWeight: 600,
             backdropFilter: 'blur(4px)',
-          }}>
-            {user.level}
-          </span>
+          }}>{user.level}</span>
         </div>
       </div>
 
-      {/* Rating + Edit Button */}
+      {/* Rating + Edit button — reputation visible on Profile */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 12 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
@@ -94,19 +82,15 @@ export default function ProfileHeader({ user, onEditClick }) {
           <StarRating rating={user.rating} size={18} />
           <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>Average Rating</div>
         </div>
-
-        {/* ← This now calls onEditClick from ProfilePage */}
         <button
+          className="edit-btn"
           onClick={onEditClick}
           style={{
             background: 'rgba(255,255,255,0.15)',
             border: '1.5px solid rgba(255,255,255,0.5)',
-            color: '#fff',
-            borderRadius: 10,
-            padding: '8px 20px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: 13,
+            color: '#fff', borderRadius: 10,
+            padding: '8px 20px', cursor: 'pointer',
+            fontWeight: 600, fontSize: 13,
             backdropFilter: 'blur(8px)',
           }}
         >
