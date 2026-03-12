@@ -7,7 +7,7 @@
 define('DB_HOST', 'localhost:3306');
 define('DB_USER', 'root');
 define('DB_PASS', '');
-define('DB_NAME', 'campus_skill_exchange');
+define('DB_NAME', 'test');
 
 function getConnection() {
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
