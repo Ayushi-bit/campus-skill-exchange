@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { browseProjects, postProject } from '../services/api';
 import Sidebar from './Sidebar';
 
-const USER_ID = 2; // Replace with session user after login
+ // Replace with session user after login
 
 const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 const STATUSES = [
@@ -22,7 +22,7 @@ const levelColors = {
   Advanced:     { active: '#dc2626', bg: '#fef2f2', border: '#fecaca' },
 };
 
-export default function PostProjectPage({ onNavigate }) {
+export default function PostProjectPage({ userId, currentUser, onNavigate, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [domains, setDomains]         = useState([]);
   const [allSkills, setAllSkills]     = useState([]);
@@ -47,7 +47,7 @@ export default function PostProjectPage({ onNavigate }) {
 
   // Load domains + skills from browse endpoint
   useEffect(() => {
-    browseProjects({ user_id: USER_ID, status: 'all' })
+    browseProjects({ user_id: userId, status: 'all' })
       .then(res => {
         setDomains(res.data.domains || []);
         setAllSkills(res.data.all_skills || []);
@@ -116,7 +116,7 @@ export default function PostProjectPage({ onNavigate }) {
     setError(null);
     try {
       const res = await postProject({
-        user_id:          USER_ID,
+        user_id:          userId,
         ...form,
         domain_id:        parseInt(form.domain_id),
         max_members:      parseInt(form.max_members),
@@ -138,7 +138,7 @@ export default function PostProjectPage({ onNavigate }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f4fe' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="post" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="post" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
 
       <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', maxWidth: 860 }}>
 

@@ -7,9 +7,9 @@
 
 import React, { useEffect, useState } from 'react';
 import Sidebar from './Sidebar';
-import { getProjectDetails, applyToProject } from '../services/api';
+import { getProjectDetails, applyToProject, updateProject } from '../services/api';
 
-const USER_ID = 2;
+
 
 const statusStyles = {
   open:        { bg: '#e8f5e9', color: '#2e7d32',  label: 'Open'        },
@@ -33,7 +33,7 @@ function avatarColor(name = '') {
   return colors[name.charCodeAt(0) % colors.length];
 }
 
-export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
+export default function ProjectDetailPage({ projectId, userId, currentUser, onNavigate, onBack, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [data,        setData]        = useState(null);
   const [loading,     setLoading]     = useState(true);
@@ -41,11 +41,14 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
   const [message,     setMessage]     = useState('');
   const [applying,    setApplying]    = useState(false);
   const [applyResult, setApplyResult] = useState(null); // { success, text }
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [removingMember, setRemovingMember] = useState(null);
+  const [ownerMsg, setOwnerMsg]             = useState(null);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    getProjectDetails(projectId, USER_ID)
+    getProjectDetails(projectId, userId)
       .then(res => setData(res.data))
       .catch(() => setError('Could not load project. Make sure your backend is running.'))
       .finally(() => setLoading(false));
@@ -54,7 +57,7 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
   const handleApply = () => {
     if (applying) return;
     setApplying(true);
-    applyToProject({ project_id: projectId, user_id: USER_ID, message })
+    applyToProject({ project_id: projectId, user_id: userId, message })
       .then(res => {
         setApplyResult({ success: true, text: res.data.message });
         setData(prev => ({ ...prev, application_status: 'pending' }));
@@ -66,10 +69,40 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
       .finally(() => setApplying(false));
   };
 
+  const handleStatusChange = async (newStatus) => {
+    setStatusUpdating(true);
+    setOwnerMsg(null);
+    try {
+      await updateProject({ action: 'update_status', user_id: userId, project_id: projectId, status: newStatus });
+      setData(prev => ({ ...prev, project: { ...prev.project, status: newStatus } }));
+      setOwnerMsg({ success: true, text: 'Status updated!' });
+    } catch (err) {
+      setOwnerMsg({ success: false, text: err.response?.data?.error || 'Failed to update status' });
+    } finally {
+      setStatusUpdating(false);
+      setTimeout(() => setOwnerMsg(null), 3000);
+    }
+  };
+
+  const handleRemoveMember = async (memberId, memberName) => {
+    if (!window.confirm(`Remove ${memberName} from this project?`)) return;
+    setRemovingMember(memberId);
+    try {
+      await updateProject({ action: 'remove_member', user_id: userId, project_id: projectId, member_id: memberId });
+      setData(prev => ({ ...prev, members: prev.members.filter(m => m.id !== memberId) }));
+      setOwnerMsg({ success: true, text: `${memberName} removed from project` });
+    } catch (err) {
+      setOwnerMsg({ success: false, text: err.response?.data?.error || 'Failed to remove member' });
+    } finally {
+      setRemovingMember(null);
+      setTimeout(() => setOwnerMsg(null), 3000);
+    }
+  };
+
   // ── LOADING ──
   if (loading) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
@@ -87,7 +120,7 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
   // ── ERROR ──
   if (error) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           background: '#fef2f2', border: '1px solid #fecaca',
@@ -172,7 +205,7 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
         }
       `}</style>
 
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
 
       <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', maxHeight: '100vh' }}>
 
@@ -286,6 +319,11 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
                 </span>
               </div>
 
+              {is_owner && project.status === 'in_progress' && members.length > 1 && (
+                <div style={{ background: '#fff8e1', border: '1px solid #fde68a', borderRadius: 10, padding: '9px 14px', fontSize: 12, color: '#b45309', fontWeight: 500, marginBottom: 12 }}>
+                  🔒 Team is locked while project is in progress
+                </div>
+              )}
               {members.length === 0
                 ? <p style={{ fontSize: 13, color: '#9ca3af' }}>No members yet.</p>
                 : members.map((m, i) => (
@@ -316,6 +354,21 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
                         {m.experience_level} · ⭐ {m.avg_rating.toFixed(1)}
                       </div>
                     </div>
+                    {is_owner && m.role !== 'owner' && project.status !== 'in_progress' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRemoveMember(m.id, m.name); }}
+                        disabled={removingMember === m.id}
+                        style={{
+                          background: 'none', border: '1px solid #fecaca', borderRadius: 8,
+                          color: '#dc2626', fontSize: 11, fontWeight: 600,
+                          padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit',
+                          opacity: removingMember === m.id ? 0.5 : 1,
+                          transition: 'all 0.15s', flexShrink: 0,
+                        }}
+                      >
+                        {removingMember === m.id ? '...' : 'Remove'}
+                      </button>
+                    )}
                   </div>
                 ))
               }
@@ -378,8 +431,52 @@ export default function ProjectDetailPage({ projectId, onNavigate, onBack }) {
 
               {/* Apply section — conditional */}
               {is_owner ? (
-                <div style={{ padding: '12px 14px', background: '#eef2ff', borderRadius: 10, fontSize: 13, color: '#4f46e5', fontWeight: 500, textAlign: 'center' }}>
-                  📌 You own this project
+                <div>
+                  {/* Owner message */}
+                  {ownerMsg && (
+                    <div style={{
+                      padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, marginBottom: 12,
+                      background: ownerMsg.success ? '#e8f5e9' : '#fef2f2',
+                      color: ownerMsg.success ? '#2e7d32' : '#dc2626',
+                      border: `1px solid ${ownerMsg.success ? '#bbf7d0' : '#fecaca'}`,
+                    }}>
+                      {ownerMsg.success ? '✓ ' : '⚠ '}{ownerMsg.text}
+                    </div>
+                  )}
+                  {/* Status change */}
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+                    Update Project Status
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {[
+                      { value: 'open',        label: '🟢 Open',        color: '#2e7d32', bg: '#e8f5e9' },
+                      { value: 'in_progress', label: '🟡 In Progress', color: '#f57f17', bg: '#fff8e1' },
+                      { value: 'completed',   label: '🔵 Completed',   color: '#1565c0', bg: '#e3f2fd' },
+                      { value: 'closed',      label: '🔴 Closed',      color: '#dc2626', bg: '#fef2f2' },
+                    ].map(s => (
+                      <button
+                        key={s.value}
+                        onClick={() => handleStatusChange(s.value)}
+                        disabled={statusUpdating || project.status === s.value}
+                        style={{
+                          padding: '8px 14px', borderRadius: 10, border: 'none',
+                          background: project.status === s.value ? s.bg : '#f9fafb',
+                          color: project.status === s.value ? s.color : '#6b7280',
+                          fontWeight: project.status === s.value ? 700 : 500,
+                          fontSize: 13, cursor: project.status === s.value ? 'default' : 'pointer',
+                          fontFamily: 'inherit', textAlign: 'left',
+                          border: project.status === s.value ? `1.5px solid ${s.color}30` : '1.5px solid #f0f0f0',
+                          opacity: statusUpdating ? 0.6 : 1,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {s.label} {project.status === s.value ? '← current' : ''}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 12, padding: '10px 14px', background: '#eef2ff', borderRadius: 10, fontSize: 13, color: '#4f46e5', fontWeight: 500, textAlign: 'center' }}>
+                    📌 You own this project
+                  </div>
                 </div>
 
               ) : application_status === 'not_applied' && project.status === 'open' ? (

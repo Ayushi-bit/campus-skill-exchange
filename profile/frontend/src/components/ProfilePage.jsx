@@ -1,5 +1,5 @@
 // ============================================================
-//  PROFILE PAGE  (Updated — onNavigate prop for sidebar routing)
+//  PROFILE PAGE
 //  File: src/components/ProfilePage.jsx
 // ============================================================
 
@@ -13,17 +13,16 @@ import ProjectsSection from './ProjectsSection';
 import ReviewsSection from './ReviewsSection';
 import EditProfilePage from './EditProfilePage';
 
-const USER_ID = 2; // Replace with session user ID after login
-
-export default function ProfilePage({ onNavigate }) {
+export default function ProfilePage({ userId, currentUser, onNavigate, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
   const [isEditing, setIsEditing]     = useState(false);
+  const [savedMsg, setSavedMsg]       = useState(false);
 
   useEffect(() => {
-    getProfile(USER_ID)
+    getProfile(userId)
       .then(res => setProfileData(res.data))
       .catch(() => setError("Could not load profile. Make sure your backend is running."))
       .finally(() => setLoading(false));
@@ -50,17 +49,19 @@ export default function ProfilePage({ onNavigate }) {
     }));
   };
 
-  // ── Loading ───────────────────────────────────────────────
+  const handleBack = () => {
+    setIsEditing(false);
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 3000);
+  };
+
+  // ── Loading ──────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="profile" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="profile" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 48, height: 48, border: '4px solid #ede9fe',
-            borderTop: '4px solid #6366f1', borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite', margin: '0 auto 16px',
-          }} />
+          <div style={{ width: 48, height: 48, border: '4px solid #ede9fe', borderTop: '4px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
           <p style={{ color: '#6b7280', fontSize: 14 }}>Loading profile...</p>
         </div>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -68,15 +69,12 @@ export default function ProfilePage({ onNavigate }) {
     </div>
   );
 
-  // ── Error ─────────────────────────────────────────────────
+  // ── Error ────────────────────────────────────────────────
   if (error) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="profile" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="profile" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{
-          background: '#fef2f2', border: '1px solid #fecaca',
-          borderRadius: 16, padding: '32px 40px', textAlign: 'center',
-        }}>
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 16, padding: '32px 40px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
           <p style={{ color: '#dc2626', fontWeight: 600 }}>{error}</p>
         </div>
@@ -91,16 +89,30 @@ export default function ProfilePage({ onNavigate }) {
         setOpen={setSidebarOpen}
         activePage="profile"
         onNavigate={onNavigate}
+        onLogout={onLogout}
+        currentUser={currentUser}
       />
 
       {isEditing ? (
         <EditProfilePage
-          userId={USER_ID}
-          onBack={() => setIsEditing(false)}
+          userId={userId}
+          currentUser={currentUser}
+          onBack={handleBack}
           onSaved={handleProfileSaved}
+          onDeleted={onLogout}
         />
       ) : (
         <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', maxWidth: 940 }}>
+          {savedMsg && (
+            <div style={{
+              background: '#f0fdf4', border: '1px solid #bbf7d0',
+              borderRadius: 12, padding: '12px 20px', marginBottom: 20,
+              color: '#15803d', fontSize: 14, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              ✅ Profile saved successfully!
+            </div>
+          )}
           <ProfileHeader user={profileData.user} onEditClick={() => setIsEditing(true)} />
           <AboutSection bio={profileData.user.bio} skills={profileData.skills} user={profileData.user} />
           <AnalyticsSection analytics={profileData.analytics} />

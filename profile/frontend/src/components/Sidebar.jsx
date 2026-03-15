@@ -9,13 +9,13 @@ const navItems = [
   { label: 'Dashboard',       icon: '⊞',  page: 'dashboard'    },
   { label: 'Browse Projects', icon: '🔍', page: 'browse'        },
   { label: 'Post Project',    icon: '✦',  page: 'post'          },
-  { label: 'My Applications', icon: '📨', page: 'applications'  },
+  { label: 'Applications',    icon: '📨', page: 'applications'  },
   { label: 'My Projects',     icon: '📁', page: 'myprojects'    },
   { label: 'Profile',         icon: '👤', page: 'profile'       },
   { label: 'Notifications',   icon: '🔔', page: 'notifications' },
 ];
 
-export default function Sidebar({ open, setOpen, activePage, onNavigate }) {
+export default function Sidebar({ open, setOpen, activePage, onNavigate, onLogout, currentUser }) {
   return (
     <aside style={{
       width: open ? 220 : 68,
@@ -71,9 +71,40 @@ export default function Sidebar({ open, setOpen, activePage, onNavigate }) {
         );
       })}
 
-      {/* Logout */}
+      {/* User info + Logout */}
       <div style={{ marginTop: 'auto' }}>
-        <div className="nav-item" title="Logout" style={{ color: '#ef4444' }}>
+
+        {/* User avatar strip */}
+        {currentUser && open && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', marginBottom: 4,
+            background: '#f5f4fe', borderRadius: 12,
+            border: '1px solid #ede9fe',
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0,
+            }}>
+              {currentUser.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2)}
+            </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.name}
+              </div>
+              <div style={{ fontSize: 10, color: '#9ca3af' }}>{currentUser.primary_domain}</div>
+            </div>
+          </div>
+        )}
+
+        <div
+          className="nav-item"
+          title="Logout"
+          style={{ color: '#ef4444' }}
+          onClick={() => onLogout && onLogout()}
+        >
           <span style={{ fontSize: 18 }}>⏻</span>
           {open && <span style={{ whiteSpace: 'nowrap' }}>Logout</span>}
         </div>

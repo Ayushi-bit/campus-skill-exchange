@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { getDashboard } from '../services/api';
 import Sidebar from './Sidebar';
 
-const USER_ID = 2;
+
 
 const activityIcon = {
   application_received : '📨',
@@ -29,14 +29,14 @@ const statusColors = {
   'Rejected':    { bg: '#fef2f2', color: '#dc2626' },
 };
 
-export default function DashboardPage({ onNavigate }) {
+export default function DashboardPage({ userId, currentUser, onNavigate, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [data, setData]               = useState(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
 
   useEffect(() => {
-    getDashboard(USER_ID)
+    getDashboard(userId)
       .then(res => setData(res.data))
       .catch(() => setError('Could not load dashboard. Make sure your backend is running.'))
       .finally(() => setLoading(false));
@@ -44,7 +44,7 @@ export default function DashboardPage({ onNavigate }) {
 
   if (loading) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
@@ -61,7 +61,7 @@ export default function DashboardPage({ onNavigate }) {
 
   if (error) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           background: '#fef2f2', border: '1px solid #fecaca',
@@ -90,7 +90,7 @@ export default function DashboardPage({ onNavigate }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f4fe' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="dashboard" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
 
       <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto', maxWidth: 960 }}>
 

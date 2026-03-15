@@ -1,13 +1,14 @@
 <?php
+require_once 'bootstrap.php';
 // ============================================================
 //  PROFILE API ENDPOINT (v2 — includes contact fields)
 //  File: backend/api/profile.php
 //  URL:  http://localhost/backend/api/profile.php?user_id=2
 // ============================================================
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: GET");
+
+
+
 
 require_once 'config.php';
 

@@ -1,13 +1,14 @@
 <?php
+require_once 'bootstrap.php';
 // ============================================================
 //  PROJECT DETAILS API
 //  File: backend/api/project_details.php
 //  URL:  GET http://localhost/backend/api/project_details.php?project_id=1&user_id=2
 // ============================================================
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: GET");
+
+
+
 
 require_once 'config.php';
 

@@ -1,4 +1,5 @@
 <?php
+require_once 'bootstrap.php';
 // ============================================================
 //  BROWSE PROJECTS API
 //  File: backend/api/browse_projects.php
@@ -7,9 +8,9 @@
 //        &skills=React,PHP&search=campus&search_mode=all&user_id=2
 // ============================================================
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: GET");
+
+
+
 
 require_once 'config.php';
 

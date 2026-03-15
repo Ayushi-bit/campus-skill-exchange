@@ -1,13 +1,14 @@
 <?php
+require_once 'bootstrap.php';
 // ============================================================
 //  DASHBOARD API
 //  File: backend/api/dashboard.php
 //  URL:  GET http://localhost/backend/api/dashboard.php?user_id=2
 // ============================================================
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: GET");
+
+
+
 
 require_once 'config.php';
 

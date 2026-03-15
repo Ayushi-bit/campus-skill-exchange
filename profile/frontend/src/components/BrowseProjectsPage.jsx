@@ -7,7 +7,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { browseProjects } from '../services/api';
 import Sidebar from './Sidebar';
 
-const USER_ID = 2; // Replace with session user after login
+ // Replace with session user after login
 
 const statusColors = {
   'Open':        { bg: '#e8f5e9', color: '#2e7d32' },
@@ -22,7 +22,7 @@ const levelColors = {
   'Advanced':     { bg: '#fef2f2', color: '#dc2626' },
 };
 
-export default function BrowseProjectsPage({ onNavigate }) {
+export default function BrowseProjectsPage({ userId, currentUser, onNavigate, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [data, setData]               = useState(null);
   const [loading, setLoading]         = useState(true);
@@ -43,7 +43,7 @@ export default function BrowseProjectsPage({ onNavigate }) {
     setError(null);
     try {
       const params = {
-        user_id:          USER_ID,
+        user_id:          userId,
         domain_id:        overrides.domainId    ?? domainId,
         experience_level: overrides.experience  ?? experience,
         search:           overrides.search      ?? search,
@@ -90,7 +90,7 @@ export default function BrowseProjectsPage({ onNavigate }) {
 
   if (error) return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
       <main style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           background: '#fef2f2', border: '1px solid #fecaca',
@@ -105,7 +105,7 @@ export default function BrowseProjectsPage({ onNavigate }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f5f4fe' }}>
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} />
+      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} activePage="browse" onNavigate={onNavigate} onLogout={onLogout} currentUser={currentUser} />
 
       <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto' }}>
 
