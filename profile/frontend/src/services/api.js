@@ -37,6 +37,9 @@ export const getProjectDetails = (projectId, userId) =>
   API.get(`project_details.php?project_id=${projectId}&user_id=${userId}`);
 export const applyToProject = (data) => API.post('apply.php', data);
 
+// ── Ratings ───────────────────────────────────────────────
+export const submitRating = (data) => API.post('submit_rating.php', data);
+
 // ── Browse & Post Project ─────────────────────────────────
 export const browseProjects = (params) => API.get('browse_projects.php', { params });
 export const postProject    = (data)   => API.post('post_project.php', data);

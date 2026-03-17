@@ -6,10 +6,6 @@ require_once 'bootstrap.php';
 //  URL:  GET http://localhost/backend/api/project_details.php?project_id=1&user_id=2
 // ============================================================
 
-
-
-
-
 require_once 'config.php';
 
 $project_id = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
@@ -127,7 +123,7 @@ if ($user_id > 0) {
     $stmt->close();
 }
 
-// ── 5. TOTAL APPLICANT COUNT ───────────────────────────────
+// ── 6. TOTAL APPLICANT COUNT ───────────────────────────────
 $stmt = $conn->prepare("
     SELECT COUNT(*) AS total FROM project_applications
     WHERE project_id = ?
@@ -137,8 +133,28 @@ $stmt->execute();
 $total_applicants = (int) $stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
-// ── 6. CHECK IF LOGGED-IN USER IS OWNER ────────────────────
+// ── 7. CHECK IF LOGGED-IN USER IS OWNER ────────────────────
 $is_owner = ($user_id > 0 && (int)$project['owner_id'] === $user_id);
+
+// ── 8. FETCH ALREADY RATED MEMBERS BY LOGGED-IN USER ───────
+$already_rated = [];
+
+if ($user_id > 0) {
+    $stmt = $conn->prepare("
+        SELECT receiver_id
+        FROM ratings
+        WHERE project_id = ? AND giver_id = ?
+    ");
+    $stmt->bind_param("ii", $project_id, $user_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    while ($row = $res->fetch_assoc()) {
+        $already_rated[] = (int) $row['receiver_id'];
+    }
+
+    $stmt->close();
+}
 
 $conn->close();
 
@@ -171,5 +187,6 @@ echo json_encode([
     "application_status" => $application_status,
     "total_applicants"   => $total_applicants,
     "is_owner"           => $is_owner,
+    "already_rated"      => $already_rated,
 ], JSON_PRETTY_PRINT);
 ?>
