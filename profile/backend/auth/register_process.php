@@ -24,7 +24,7 @@ $check->bind_param("s", $email);
 $check->execute();
 $check->store_result();
 if ($check->num_rows > 0) {
-    header("Location: register.php?error=Email+already+registered");
+    header("Location: login.php?error=Email+already+registered");
     exit();
 }
 $check->close();

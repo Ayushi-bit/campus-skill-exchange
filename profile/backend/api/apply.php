@@ -1,18 +1,5 @@
 <?php
 require_once 'bootstrap.php';
-// ============================================================
-//  APPLY API
-//  File: backend/api/apply.php
-//  URL:  POST http://localhost/backend/api/apply.php
-//  Body: { project_id, user_id, message }
-// ============================================================
-
-
-
-
-
-
-
 require_once 'config.php';
 
 $data       = json_decode(file_get_contents("php://input"), true);
@@ -29,7 +16,7 @@ if ($project_id <= 0 || $user_id <= 0) {
 $conn = getConnection();
 
 // Check project exists and is open
-$stmt = $conn->prepare("SELECT id, posted_by, max_members, status FROM projects WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, posted_by, max_members, status, title FROM projects WHERE id = ?");
 $stmt->bind_param("i", $project_id);
 $stmt->execute();
 $project = $stmt->get_result()->fetch_assoc();
@@ -62,25 +49,45 @@ if ($existing) {
 }
 
 // Insert application
-$stmt = $conn->prepare("
-    INSERT INTO project_applications (project_id, applicant_id, status, message)
-    VALUES (?, ?, 'pending', ?)
-");
+$stmt = $conn->prepare("INSERT INTO project_applications (project_id, applicant_id, status, message) VALUES (?, ?, 'pending', ?)");
 $stmt->bind_param("iis", $project_id, $user_id, $message);
 $stmt->execute();
 $stmt->close();
 
-// Notify project owner
-$notif_msg = "New application received for your project!";
-$stmt = $conn->prepare("
-    INSERT INTO notifications (user_id, type, message)
-    VALUES (?, 'new_application', ?)
-");
+// Get applicant name
+$stmt = $conn->prepare("SELECT name FROM users WHERE id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$applicant = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// Get owner email + name
+$stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+$stmt->bind_param("i", $project['posted_by']);
+$stmt->execute();
+$owner = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// Save notification in DB
+$notif_msg = "{$applicant['name']} applied for your project \"{$project['title']}\".";
+$stmt = $conn->prepare("INSERT INTO notifications (user_id, type, message) VALUES (?, 'application_received', ?)");
 $stmt->bind_param("is", $project['posted_by'], $notif_msg);
 $stmt->execute();
 $stmt->close();
 
 $conn->close();
+error_log("Sending email to: " . $owner['email'] . " type: application_received");
+
+// Send email notification (non-blocking — won't crash if email fails)
+$conn->close();
+
+// Send email notification to project owner
+try {
+    require_once __DIR__ . '/../notifications/send_email_notification.php';
+    sendEmailNotification($owner['email'], $owner['name'], 'application_received', $notif_msg);
+} catch (Exception $e) {
+    error_log("Email failed: " . $e->getMessage());
+}
 
 echo json_encode(["success" => true, "message" => "Application submitted successfully"]);
 ?>

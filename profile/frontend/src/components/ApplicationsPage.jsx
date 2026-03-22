@@ -1,345 +1,328 @@
-// ============================================================
-//  APPLICATIONS PAGE
-//  File: src/components/ApplicationsPage.jsx
-//  Two tabs: Sent (my applications) + Received (on my projects)
-// ============================================================
-
 import React, { useEffect, useState } from 'react';
-import { getApplications, manageApplication } from '../services/api';
 import Sidebar from './Sidebar';
+import Avatar from './Avatar';
+import StarRating from './StarRating';
+import StatusBadge from './StatusBadge';
+import SkillTag from './SkillTag';
+import { SkeletonCard } from './LoadingSkeleton';
+import { getApplications, manageApplication } from '../services/api';
+import { useToast } from './Toast';
 
-const statusColors = {
-  pending:  { bg: '#fff8e1', color: '#f57f17', label: 'Pending' },
-  accepted: { bg: '#e8f5e9', color: '#2e7d32', label: 'Accepted' },
-  rejected: { bg: '#fef2f2', color: '#dc2626', label: 'Rejected' },
-};
+function SentCard({ app, onNavigate }) {
+  const statusStyles = {
+    pending:  { color: 'var(--warning)',  bg: 'var(--warning-bg)',  icon: '⏳' },
+    accepted: { color: 'var(--success)',  bg: 'var(--success-bg)',  icon: '🎉' },
+    rejected: { color: 'var(--danger)',   bg: 'var(--danger-bg)',   icon: '😔' },
+  };
+  const s = statusStyles[app.status?.toLowerCase()] || statusStyles.pending;
 
-export default function ApplicationsPage({ userId, currentUser, onNavigate, onLogout }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab]     = useState('sent');
-  const [sent, setSent]               = useState([]);
-  const [received, setReceived]       = useState([]);
-  const [loadingSent, setLoadingSent] = useState(true);
-  const [loadingReceived, setLoadingReceived] = useState(true);
-  const [actionLoading, setActionLoading]     = useState(null); // application_id being actioned
+  return (
+    <div className="card" style={{ transition: 'all 0.2s', cursor: 'pointer' }}
+      onClick={() => onNavigate('project', app.project_id)}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--skin)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ flex: 1, marginRight: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown)', marginBottom: 4, lineHeight: 1.3 }}>
+            {app.project_title}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+            {app.domain} · by <span style={{ color: 'var(--brown)', fontWeight: 600 }}>{app.owner_name}</span>
+          </div>
+        </div>
+        <span style={{
+          padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+          color: s.color, background: s.bg, whiteSpace: 'nowrap',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}>
+          {s.icon} {app.status?.charAt(0).toUpperCase() + app.status?.slice(1)}
+        </span>
+      </div>
 
-  useEffect(() => {
-    getApplications(userId, 'sent')
-      .then(res => setSent(res.data.applications || []))
-      .catch(() => setSent([]))
-      .finally(() => setLoadingSent(false));
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: app.message ? 10 : 0 }}>
+        <StatusBadge status={app.experience_level} />
+        <StatusBadge status={app.project_status} />
+        <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
+          Applied {app.applied_at}
+        </span>
+      </div>
 
-    getApplications(userId, 'received')
-      .then(res => setReceived(res.data.applications || []))
-      .catch(() => setReceived([]))
-      .finally(() => setLoadingReceived(false));
-  }, [userId]);
+      {app.message && (
+        <div style={{ padding: '8px 12px', background: 'var(--surface)', borderRadius: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, fontStyle: 'italic', marginTop: 8 }}>
+          "{app.message}"
+        </div>
+      )}
+    </div>
+  );
+}
 
-  const handleAction = async (applicationId, action) => {
-    setActionLoading(applicationId + action);
+function ReceivedCard({ app, onManage, onNavigate }) {
+  const toast = useToast();
+  const [loading, setLoading] = useState('');
+  const [status, setStatus]   = useState(app.status);
+  const [expanded, setExpanded] = useState(false);
+
+  const handle = async (action) => {
+    setLoading(action);
     try {
-      await manageApplication({ application_id: applicationId, action, user_id: userId });
-      // Update local state
-      setReceived(prev => prev.map(a =>
-        a.id === applicationId ? { ...a, status: action === 'accept' ? 'accepted' : 'rejected' } : a
-      ));
-    } catch (err) {
-      alert(err.response?.data?.error || 'Something went wrong');
+      const res = await onManage({ application_id: app.id, action, user_id: app.owner_id });
+      if (res.data.success) {
+        setStatus(res.data.new_status);
+        toast(`Application ${res.data.new_status}! ${action === 'accept' ? '✅' : '❌'}`, action === 'accept' ? 'success' : 'info');
+      } else {
+        toast(res.data.error || 'Action failed', 'error');
+      }
+    } catch (e) {
+      toast(e.response?.data?.error || 'Action failed', 'error');
     } finally {
-      setActionLoading(null);
+      setLoading('');
     }
   };
 
-  const pendingCount = received.filter(a => a.status === 'pending').length;
+  const isPending = status === 'pending';
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f7ff' }}>
-      <Sidebar
-        open={sidebarOpen}
-        setOpen={setSidebarOpen}
-        activePage="applications"
-        onNavigate={onNavigate}
-        onLogout={onLogout}
-        currentUser={currentUser}
-      />
+    <div className="card" style={{ transition: 'border-color 0.2s' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--skin)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+    >
+      {/* Header row */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+        <Avatar name={app.applicant_name} size={44} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown)', marginBottom: 2 }}>
+                {app.applicant_name}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                {app.applicant_email}
+              </div>
+            </div>
+            <StatusBadge status={status} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+            <StarRating value={app.avg_rating} readOnly size={13} />
+            <StatusBadge status={app.experience_level} />
+            <span style={{ fontSize: 11, color: 'var(--muted)', padding: '2px 8px', background: 'var(--surface)', borderRadius: 10 }}>
+              {app.domain}
+            </span>
+          </div>
+        </div>
+      </div>
 
-      <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto' }}>
+      {/* Project name */}
+      <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+        For project:{' '}
+        <span
+          onClick={() => onNavigate('project', app.project_id)}
+          style={{ color: 'var(--orange)', fontWeight: 600, cursor: 'pointer' }}
+        >
+          {app.project_title}
+        </span>
+        <span style={{ marginLeft: 8, fontFamily: "'DM Mono', monospace" }}>· {app.applied_at}</span>
+      </div>
 
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 800, color: '#1e1b4b', margin: '0 0 6px' }}>
-            Applications
-          </h1>
-          <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>
-            Track applications you've sent and manage ones you've received
-          </p>
+      {/* Skills */}
+      {app.skills?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
+          {app.skills.slice(0, 5).map(s => <SkillTag key={s} name={s} small />)}
+          {app.skills.length > 5 && <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>+{app.skills.length - 5}</span>}
+        </div>
+      )}
+
+      {/* Message */}
+      {app.message && (
+        <div style={{ marginBottom: 12 }}>
+          <div
+            onClick={() => setExpanded(e => !e)}
+            style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, fontStyle: 'italic', cursor: 'pointer',
+              display: expanded ? 'block' : '-webkit-box',
+              WebkitLineClamp: expanded ? undefined : 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: expanded ? 'visible' : 'hidden',
+              padding: '8px 12px', background: 'var(--surface)', borderRadius: 8,
+            }}
+          >
+            "{app.message}"
+            {!expanded && app.message.length > 120 && (
+              <span style={{ color: 'var(--orange)', marginLeft: 4 }}>read more</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {isPending ? (
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            className="btn btn-sm"
+            onClick={() => handle('accept')}
+            disabled={!!loading}
+            style={{ flex: 1, background: 'var(--success-bg)', color: 'var(--success)', border: '1px solid rgba(90,138,90,0.4)', fontWeight: 700 }}
+          >
+            {loading === 'accept' ? '⏳' : '✅'} Accept
+          </button>
+          <button
+            className="btn btn-sm"
+            onClick={() => handle('reject')}
+            disabled={!!loading}
+            style={{ flex: 1, background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid rgba(200,64,64,0.4)', fontWeight: 700 }}
+          >
+            {loading === 'reject' ? '⏳' : '❌'} Reject
+          </button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: status === 'accepted' ? 'var(--success)' : 'var(--danger)', fontWeight: 700, textAlign: 'center', padding: '6px 0' }}>
+          {status === 'accepted' ? '✅ Application Accepted' : '❌ Application Rejected'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TABS = ['sent', 'received'];
+
+export default function ApplicationsPage({ userId, currentUser, onNavigate, onLogout }) {
+  const toast = useToast();
+  const [tab, setTab]             = useState('sent');
+  const [sentApps, setSentApps]   = useState([]);
+  const [recvApps, setRecvApps]   = useState([]);
+  const [loadSent, setLoadSent]   = useState(true);
+  const [loadRecv, setLoadRecv]   = useState(true);
+
+  useEffect(() => {
+    getApplications(userId, 'sent')
+      .then(res => setSentApps(res.data.applications || []))
+      .catch(() => {})
+      .finally(() => setLoadSent(false));
+
+    getApplications(userId, 'received')
+      .then(res => setRecvApps(res.data.applications || []))
+      .catch(() => {})
+      .finally(() => setLoadRecv(false));
+  }, [userId]);
+
+  const handleManage = async (data) => {
+    const res = await manageApplication(data);
+    return res;
+  };
+
+  const pendingCount = recvApps.filter(a => a.status === 'pending').length;
+
+  return (
+    <div className="app-layout">
+      <Sidebar currentPage="applications" currentUser={currentUser} onNavigate={onNavigate} onLogout={onLogout} />
+      <main className="main-content page-enter">
+
+        <div className="page-header">
+          <div>
+            <h1 style={{ fontSize: 26 }}>Applications</h1>
+            <p>Track your applications and manage incoming ones</p>
+          </div>
+          {pendingCount > 0 && (
+            <span style={{ padding: '6px 14px', borderRadius: 20, background: 'var(--warning-bg)', color: 'var(--warning)', fontSize: 13, fontWeight: 700 }}>
+              ⏳ {pendingCount} pending review
+            </span>
+          )}
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          {[
-            { key: 'sent',     label: 'Sent',     count: sent.length },
-            { key: 'received', label: 'Received', count: pendingCount, badge: pendingCount > 0 },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                padding: '9px 20px',
-                borderRadius: 12,
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontWeight: 700,
-                fontSize: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: activeTab === tab.key
-                  ? 'linear-gradient(135deg, #6366f1, #7c3aed)'
-                  : '#fff',
-                color: activeTab === tab.key ? '#fff' : '#6b7280',
-                boxShadow: activeTab === tab.key
-                  ? '0 4px 12px rgba(99,102,241,0.3)'
-                  : '0 1px 4px rgba(0,0,0,0.06)',
-                transition: 'all 0.2s',
-              }}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span style={{
-                  background: activeTab === tab.key
-                    ? 'rgba(255,255,255,0.3)'
-                    : tab.badge ? '#ef4444' : '#ede9fe',
-                  color: activeTab === tab.key
-                    ? '#fff'
-                    : tab.badge ? '#fff' : '#6366f1',
-                  borderRadius: 20,
-                  padding: '1px 8px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="tabs">
+          <button
+            className={`tab-btn ${tab === 'sent' ? 'active' : ''}`}
+            onClick={() => setTab('sent')}
+          >
+            📤 My Applications ({sentApps.length})
+          </button>
+          <button
+            className={`tab-btn ${tab === 'received' ? 'active' : ''}`}
+            onClick={() => setTab('received')}
+          >
+            📥 Received
+            {pendingCount > 0 && (
+              <span style={{ marginLeft: 6, background: 'var(--warning)', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                {pendingCount}
+              </span>
+            )}
+            {' '}({recvApps.length})
+          </button>
         </div>
 
-        {/* ── SENT TAB ── */}
-        {activeTab === 'sent' && (
-          loadingSent ? <LoadingSpinner /> :
-          sent.length === 0 ? (
-            <EmptyState
-              icon="📨"
-              title="No applications sent yet"
-              subtitle="Browse projects and apply to ones that interest you"
-              action="Browse Projects"
-              onAction={() => onNavigate('browse')}
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {sent.map(app => (
-                <div key={app.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span
-                          onClick={() => onNavigate('project', app.project_id)}
-                          style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: '#1e1b4b', cursor: 'pointer' }}
-                        >
-                          {app.project_title}
-                        </span>
-                        <span style={{ ...pillStyle, background: '#f5f4fe', color: '#6366f1' }}>
-                          {app.domain}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
-                        by <strong style={{ color: '#4b5563' }}>{app.owner_name}</strong> · Applied {app.applied_at}
-                      </div>
-                      {app.message && (
-                        <div style={{ fontSize: 13, color: '#6b7280', background: '#f9fafb', borderRadius: 8, padding: '8px 12px', borderLeft: '3px solid #ede9fe' }}>
-                          "{app.message}"
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                      <span style={{
-                        ...pillStyle,
-                        background: statusColors[app.status]?.bg,
-                        color: statusColors[app.status]?.color,
-                        fontWeight: 700,
-                      }}>
-                        {statusColors[app.status]?.label}
+        {/* Sent Applications */}
+        {tab === 'sent' && (
+          <>
+            {loadSent ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {[1,2,3].map(i => <SkeletonCard key={i} />)}
+              </div>
+            ) : sentApps.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📤</div>
+                <h3>No applications sent yet</h3>
+                <p>Start exploring projects and apply to ones that match your skills!</p>
+                <button className="btn btn-primary btn-sm" onClick={() => onNavigate('browse')}>
+                  🔍 Browse Projects
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Summary row */}
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {['pending', 'accepted', 'rejected'].map(s => {
+                    const count = sentApps.filter(a => a.status === s).length;
+                    if (!count) return null;
+                    return (
+                      <span key={s} className={`badge badge-${s}`} style={{ fontSize: 12, padding: '4px 12px' }}>
+                        {s === 'pending' ? '⏳' : s === 'accepted' ? '✅' : '❌'} {count} {s}
                       </span>
-                      <span style={{ ...pillStyle, background: '#f1f0ff', color: '#7c3aed' }}>
-                        {app.experience_level}
-                      </span>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-          )
+                {sentApps.map(app => (
+                  <SentCard key={app.id} app={app} onNavigate={onNavigate} />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
-        {/* ── RECEIVED TAB ── */}
-        {activeTab === 'received' && (
-          loadingReceived ? <LoadingSpinner /> :
-          received.length === 0 ? (
-            <EmptyState
-              icon="📥"
-              title="No applications received yet"
-              subtitle="Post a project to start receiving applications from other students"
-              action="Post a Project"
-              onAction={() => onNavigate('post')}
-            />
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {received.map(app => (
-                <div key={app.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-                    <div style={{ flex: 1 }}>
-                      {/* Project name */}
-                      <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        {app.project_title}
-                      </div>
-                      {/* Applicant info */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
-                        }}>
-                          {app.applicant_name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                        </div>
-                        <div>
-                          <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>
-                            {app.applicant_name}
-                          </div>
-                          <div style={{ fontSize: 12, color: '#9ca3af' }}>
-                            {app.domain} · {app.experience_level} · ⭐ {app.avg_rating?.toFixed(1)}
-                          </div>
-                        </div>
-                      </div>
-                      {app.message && (
-                        <div style={{ fontSize: 13, color: '#6b7280', background: '#f9fafb', borderRadius: 8, padding: '8px 12px', borderLeft: '3px solid #ede9fe', marginTop: 8 }}>
-                          "{app.message}"
-                        </div>
-                      )}
-                      {app.skills && app.skills.length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                          {app.skills.map(skill => (
-                            <span key={skill} style={{
-                              background: '#f5f4fe', color: '#6366f1',
-                              border: '1px solid #e0dcff',
-                              borderRadius: 20, padding: '2px 10px',
-                              fontSize: 11, fontWeight: 600,
-                            }}>
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 12, color: '#d1d5db', marginTop: 8 }}>
-                        Applied {app.applied_at}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                      {app.status === 'pending' ? (
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            onClick={() => handleAction(app.id, 'reject')}
-                            disabled={actionLoading !== null}
-                            style={{
-                              padding: '7px 16px', borderRadius: 10, border: '1.5px solid #fecaca',
-                              background: '#fff', color: '#dc2626', fontWeight: 600, fontSize: 13,
-                              cursor: actionLoading !== null ? 'not-allowed' : 'pointer',
-                              fontFamily: 'inherit', opacity: actionLoading !== null ? 0.6 : 1,
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            {actionLoading === app.id + 'reject' ? '...' : '✕ Reject'}
-                          </button>
-                          <button
-                            onClick={() => handleAction(app.id, 'accept')}
-                            disabled={actionLoading !== null}
-                            style={{
-                              padding: '7px 16px', borderRadius: 10, border: 'none',
-                              background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
-                              color: '#fff', fontWeight: 700, fontSize: 13,
-                              cursor: actionLoading !== null ? 'not-allowed' : 'pointer',
-                              fontFamily: 'inherit', opacity: actionLoading !== null ? 0.6 : 1,
-                              boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
-                              transition: 'all 0.15s',
-                            }}
-                          >
-                            {actionLoading === app.id + 'accept' ? '...' : '✓ Accept'}
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{
-                          ...pillStyle,
-                          background: statusColors[app.status]?.bg,
-                          color: statusColors[app.status]?.color,
-                          fontWeight: 700,
-                        }}>
-                          {statusColors[app.status]?.label}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
+        {/* Received Applications */}
+        {tab === 'received' && (
+          <>
+            {loadRecv ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {[1,2,3].map(i => <SkeletonCard key={i} />)}
+              </div>
+            ) : recvApps.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">📥</div>
+                <h3>No applications received yet</h3>
+                <p>Post a project and students will start applying!</p>
+                <button className="btn btn-primary btn-sm" onClick={() => onNavigate('post')}>
+                  ➕ Post a Project
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Pending first */}
+                {recvApps
+                  .sort((a, b) => (a.status === 'pending' ? -1 : 1))
+                  .map(app => (
+                    <ReceivedCard
+                      key={app.id}
+                      app={{ ...app, owner_id: userId }}
+                      onManage={handleManage}
+                      onNavigate={onNavigate}
+                    />
+                  ))
+                }
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
   );
 }
-
-function LoadingSpinner() {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
-      <div style={{ width: 40, height: 40, border: '4px solid #ede9fe', borderTop: '4px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-function EmptyState({ icon, title, subtitle, action, onAction }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>{icon}</div>
-      <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: '#1e1b4b', marginBottom: 8 }}>{title}</div>
-      <div style={{ fontSize: 14, color: '#9ca3af', marginBottom: 24 }}>{subtitle}</div>
-      <button
-        onClick={onAction}
-        style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
-      >
-        {action}
-      </button>
-    </div>
-  );
-}
-
-const cardStyle = {
-  background: '#fff',
-  borderRadius: 16,
-  padding: '20px 24px',
-  boxShadow: '0 2px 12px rgba(99,102,241,0.06)',
-  border: '1px solid #ede9fe',
-  transition: 'box-shadow 0.2s',
-};
-
-const pillStyle = {
-  display: 'inline-block',
-  padding: '3px 10px',
-  borderRadius: 20,
-  fontSize: 12,
-  fontWeight: 600,
-};

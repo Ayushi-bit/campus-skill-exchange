@@ -1,363 +1,411 @@
-// ============================================================
-//  EDIT PROFILE PAGE (v3 — email OTP, change password, delete)
-//  File: src/components/EditProfilePage.jsx
-// ============================================================
+import React, { useEffect, useState } from 'react';
+import Sidebar from './Sidebar';
+import SkillTag from './SkillTag';
+import { SkeletonBox } from './LoadingSkeleton';
+import { getEditProfile, updateProfile, sendEmailOtp, verifyEmailOtp, changePassword, deleteAccount } from '../services/api';
+import { useToast } from './Toast';
 
-import React, { useEffect, useState, useRef } from 'react';
-import { getEditProfile, updateProfile, sendEmailOtp, verifyEmailOtp } from '../services/api';
-import EmailVerifyModal from './EmailVerifyModal';
-import DeleteAccountModal from './DeleteAccountModal';
-import ChangePasswordModal from './ChangePasswordModal';
-
-export default function EditProfilePage({ userId, currentUser, onBack, onSaved, onDeleted }) {
-  const [form, setForm]           = useState(null);
-  const [domains, setDomains]     = useState([]);
-  const [allSkills, setAllSkills] = useState([]);
-  const [selectedSkillIds, setSelectedSkillIds] = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState(null);
-  const [success, setSuccess]     = useState(false);
-  const [showDeleteModal, setShowDeleteModal]   = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showEmailModal, setShowEmailModal]     = useState(false);
-  const [emailOtpError, setEmailOtpError]       = useState('');
-  const [otpLoading, setOtpLoading]             = useState(false);
-  const [pendingFormData, setPendingFormData]   = useState(null);
-
-  // Use ref to track if component is still mounted
-  const isMounted = useRef(true);
-  useEffect(() => {
-    return () => { isMounted.current = false; };
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await getEditProfile(userId);
-        const u = res.data.user;
-        if (!isMounted.current) return;
-        setForm({
-          name:              u.name || '',
-          email:             u.email || '',
-          bio:               u.bio || '',
-          profile_image:     u.profile_image || '',
-          experience_level:  u.experience_level || 'Beginner',
-          primary_domain_id: u.primary_domain_id || '',
-          github_url:        u.github_url || '',
-          linkedin_url:      u.linkedin_url || '',
-          portfolio_url:     u.portfolio_url || '',
-          whatsapp_number:   u.whatsapp_number || '',
-        });
-        setDomains(res.data.domains);
-        setAllSkills(res.data.all_skills);
-        setSelectedSkillIds(res.data.user_skills.map(s => parseInt(s.id)));
-      } catch (err) {
-        if (isMounted.current) setError("Failed to load profile data.");
-      } finally {
-        if (isMounted.current) setLoading(false);
-      }
-    };
-    fetchData();
-  }, [userId]);
-
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setSuccess(false);
-    setError(null);
-  };
-
-  const toggleSkill = (skillId) => {
-    const id = parseInt(skillId);
-    setSelectedSkillIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const handleSubmit = async () => {
-    if (!form.name.trim() || !form.email.trim()) {
-      setError("Name and email are required.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setSuccess(false);
-
-    const payload = { user_id: userId, ...form, skill_ids: selectedSkillIds, action: 'save' };
-
-    try {
-      const res = await updateProfile(payload);
-      if (res.data.success) {
-        if (onSaved) onSaved(res.data.user, res.data.skills);
-        setSuccess(true);
-        setSaving(false);
-        setTimeout(() => {
-          if (isMounted.current) onBack();
-        }, 1500);
-      }
-    } catch (err) {
-      const data = err.response?.data;
-      setSaving(false);
-
-      if (data?.email_changed) {
-        setError(null);
-        const pending = { user_id: userId, ...form, skill_ids: selectedSkillIds };
-        setPendingFormData(pending);
-        try {
-          await sendEmailOtp(pending);
-          if (isMounted.current) setShowEmailModal(true);
-        } catch (otpErr) {
-          if (isMounted.current) setError(otpErr.response?.data?.error || "Failed to send OTP. Please try again.");
-        }
-        return;
-      }
-      setError(data?.error || "Failed to save. Please try again.");
-    }
-  };
-
-  const handleVerifyOtp = async (otp) => {
-    if (otpLoading) return;
-    setOtpLoading(true);
-    setEmailOtpError('');
-    try {
-      const res = await verifyEmailOtp({ ...pendingFormData, otp });
-      if (res.data.success) {
-        if (onSaved) onSaved(res.data.user, res.data.skills);
-        setShowEmailModal(false);
-        setPendingFormData(null);
-        setOtpLoading(false);
-        setSuccess(true);
-        setTimeout(() => {
-          if (isMounted.current) onBack();
-        }, 1500);
-      }
-    } catch (err) {
-      setEmailOtpError(err.response?.data?.error || "Invalid OTP. Please try again.");
-      setOtpLoading(false);
-    }
-  };
-
-  if (loading) return (
-    <div style={s.centered}>
-      <div style={s.spinner} />
-      <p style={{ color: '#6b7280', fontSize: 14, marginTop: 16 }}>Loading profile...</p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-
-  if (!form) return null;
-
-  const initials = form.name.split(' ').map(n => n[0]).join('').toUpperCase();
-
+function Section({ title, children }) {
   return (
-    <div style={s.page}>
-
-      {/* Header */}
-      <div style={s.header}>
-        <button onClick={onBack} style={s.backBtn}>← Back to Profile</button>
-        <h1 style={s.pageTitle}>Edit Profile</h1>
-      </div>
-
-      <div style={s.card}>
-
-        {/* Avatar */}
-        <div style={s.avatarSection}>
-          <div style={s.avatar}>{initials}</div>
-          <p style={s.avatarHint}>Avatar is generated from your name initials</p>
-        </div>
-
-        <div style={s.divider} />
-
-        {/* Basic Info */}
-        <div style={s.sectionLabel}>Basic Information</div>
-        <div style={s.grid}>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Full Name <span style={s.required}>*</span></label>
-            <input name="name" value={form.name} onChange={handleChange} style={s.input} placeholder="Your full name" />
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Email <span style={s.required}>*</span></label>
-            <input name="email" type="email" value={form.email} onChange={handleChange} style={s.input} placeholder="your@email.com" />
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Experience Level</label>
-            <select name="experience_level" value={form.experience_level} onChange={handleChange} style={s.input}>
-              <option value="Beginner">Beginner</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Advanced">Advanced</option>
-            </select>
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>Primary Domain</label>
-            <select name="primary_domain_id" value={form.primary_domain_id} onChange={handleChange} style={s.input}>
-              <option value="">-- Select Domain --</option>
-              {domains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-          <div style={{ ...s.fieldGroup, gridColumn: '1 / -1' }}>
-            <label style={s.label}>Profile Image URL</label>
-            <input name="profile_image" value={form.profile_image} onChange={handleChange} style={s.input} placeholder="https://example.com/photo.jpg (optional)" />
-          </div>
-          <div style={{ ...s.fieldGroup, gridColumn: '1 / -1' }}>
-            <label style={s.label}>Bio</label>
-            <textarea name="bio" value={form.bio} onChange={handleChange} style={{ ...s.input, height: 100, resize: 'vertical' }} placeholder="Tell others about yourself..." />
-          </div>
-        </div>
-
-        <div style={s.divider} />
-
-        {/* Contact Links */}
-        <div style={s.sectionLabel}>Contact & Social Links</div>
-        <div style={s.grid}>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>🐙 GitHub URL</label>
-            <input name="github_url" value={form.github_url} onChange={handleChange} style={s.input} placeholder="https://github.com/username" />
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>💼 LinkedIn URL</label>
-            <input name="linkedin_url" value={form.linkedin_url} onChange={handleChange} style={s.input} placeholder="https://linkedin.com/in/username" />
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>🌐 Portfolio URL</label>
-            <input name="portfolio_url" value={form.portfolio_url} onChange={handleChange} style={s.input} placeholder="https://yourportfolio.com" />
-          </div>
-          <div style={s.fieldGroup}>
-            <label style={s.label}>💬 WhatsApp Number</label>
-            <input name="whatsapp_number" value={form.whatsapp_number} onChange={handleChange} style={s.input} placeholder="+91 98765 43210" />
-          </div>
-        </div>
-
-        <div style={s.divider} />
-
-        {/* Skills */}
-        <div style={s.sectionLabel}>
-          Skills
-          <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 8, fontSize: 13 }}>
-            ({selectedSkillIds.length} selected — click to toggle)
-          </span>
-        </div>
-        <div style={{ ...s.skillsGrid, marginBottom: 24 }}>
-          {allSkills.map(skill => {
-            const isSelected = selectedSkillIds.includes(parseInt(skill.id));
-            return (
-              <button
-                key={skill.id}
-                onClick={() => toggleSkill(skill.id)}
-                style={{
-                  ...s.skillChip,
-                  background: isSelected ? 'linear-gradient(135deg, #6366f1, #7c3aed)' : '#f5f4fe',
-                  color:      isSelected ? '#fff' : '#6366f1',
-                  border:     isSelected ? '1.5px solid #6366f1' : '1.5px solid #e0dcff',
-                  boxShadow:  isSelected ? '0 2px 8px rgba(99,102,241,0.25)' : 'none',
-                  fontWeight: isSelected ? 700 : 500,
-                }}
-              >
-                {isSelected ? '✓ ' : ''}{skill.name}
-              </button>
-            );
-          })}
-        </div>
-
-        {error   && <div style={s.errorBox}>⚠️ {error}</div>}
-        {success && <div style={s.successBox}>✅ Profile saved! Redirecting back...</div>}
-
-        {/* Actions */}
-        <div style={s.actions}>
-          <button onClick={onBack} disabled={saving} style={s.cancelBtn}>Cancel</button>
-          <button onClick={handleSubmit} disabled={saving || success} style={{ ...s.saveBtn, opacity: saving || success ? 0.7 : 1 }}>
-            {saving ? 'Saving...' : success ? 'Saved! ✓' : '✓ Save Changes'}
-          </button>
-        </div>
-      </div>
-
-      {/* Security */}
-      <div style={{ ...s.dangerCard, border: '1px solid #ede9fe', boxShadow: '0 4px 24px rgba(99,102,241,0.08)', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#1e1b4b', marginBottom: 4 }}>🔒 Change Password</div>
-            <div style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.5 }}>
-              {currentUser?.is_google_user
-                ? 'You signed in with Google. You can set a password to also log in with email.'
-                : 'Update your password to keep your account secure.'}
-            </div>
-          </div>
-          <button onClick={() => setShowPasswordModal(true)} style={{ ...s.deleteBtn, color: '#6366f1', borderColor: '#6366f1' }}>
-            Change Password
-          </button>
-        </div>
-      </div>
-
-      {/* Danger Zone */}
-      <div style={s.dangerCard}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#7f1d1d', marginBottom: 4 }}>🗑 Delete Account</div>
-            <div style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.5 }}>
-              Permanently delete your account and all associated data. This cannot be undone.
-            </div>
-          </div>
-          <button onClick={() => setShowDeleteModal(true)} style={s.deleteBtn}>Delete Account</button>
-        </div>
-      </div>
-
-      {/* Modals */}
-      {showEmailModal && pendingFormData && (
-        <EmailVerifyModal
-          newEmail={pendingFormData.email}
-          onVerify={handleVerifyOtp}
-          onClose={() => { setShowEmailModal(false); setEmailOtpError(''); setPendingFormData(null); }}
-          loading={otpLoading}
-          error={emailOtpError}
-        />
-      )}
-
-      {showPasswordModal && (
-        <ChangePasswordModal
-          userId={userId}
-          isGoogleUser={currentUser?.is_google_user || false}
-          onClose={() => setShowPasswordModal(false)}
-        />
-      )}
-
-      {showDeleteModal && (
-        <DeleteAccountModal
-          userId={userId}
-          isGoogleUser={currentUser?.is_google_user || false}
-          onClose={() => setShowDeleteModal(false)}
-          onDeleted={onDeleted}
-        />
-      )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h3 style={{ fontSize: 15, marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>{title}</h3>
+      {children}
     </div>
   );
 }
 
-const s = {
-  page:          { flex: 1, padding: '32px 28px', maxWidth: 820, overflowY: 'auto' },
-  centered:      { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' },
-  spinner:       { width: 44, height: 44, border: '4px solid #ede9fe', borderTop: '4px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' },
-  header:        { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 },
-  pageTitle:     { fontFamily: "'Sora', sans-serif", fontSize: 22, fontWeight: 800, color: '#1e1b4b', margin: 0 },
-  backBtn:       { background: '#f5f4fe', border: 'none', borderRadius: 10, padding: '8px 16px', color: '#6366f1', fontWeight: 600, fontSize: 13, cursor: 'pointer' },
-  card:          { background: '#fff', borderRadius: 20, padding: '32px 36px', boxShadow: '0 4px 24px rgba(99,102,241,0.08)', border: '1px solid #ede9fe', marginBottom: 24 },
-  avatarSection: { display: 'flex', alignItems: 'center', gap: 20, marginBottom: 24 },
-  avatar:        { width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800, color: '#fff', flexShrink: 0 },
-  avatarHint:    { fontSize: 13, color: '#9ca3af', margin: 0 },
-  divider:       { height: 1, background: '#f1f0ff', marginBottom: 20, marginTop: 4 },
-  sectionLabel:  { fontSize: 14, fontWeight: 700, color: '#1e1b4b', marginBottom: 16 },
-  grid:          { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px 24px', marginBottom: 20 },
-  fieldGroup:    { display: 'flex', flexDirection: 'column', gap: 6 },
-  label:         { fontSize: 13, fontWeight: 600, color: '#4b5563' },
-  required:      { color: '#ef4444' },
-  input:         { border: '1.5px solid #e5e7eb', borderRadius: 10, padding: '10px 14px', fontSize: 14, color: '#1e1b4b', outline: 'none', fontFamily: 'inherit', background: '#fafafa', width: '100%', boxSizing: 'border-box' },
-  skillsGrid:    { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  skillChip:     { borderRadius: 20, padding: '6px 16px', fontSize: 13, cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit' },
-  errorBox:      { background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '12px 16px', color: '#dc2626', fontSize: 13, marginBottom: 16 },
-  successBox:    { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 16px', color: '#16a34a', fontSize: 13, marginBottom: 16 },
-  actions:       { display: 'flex', justifyContent: 'flex-end', gap: 12 },
-  cancelBtn:     { background: '#f5f4fe', border: 'none', borderRadius: 12, padding: '10px 24px', color: '#6366f1', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
-  saveBtn:       { background: 'linear-gradient(135deg, #6366f1, #7c3aed)', border: 'none', borderRadius: 12, padding: '10px 28px', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' },
-  dangerCard:    { background: '#fff', borderRadius: 20, padding: '24px 36px', boxShadow: '0 4px 24px rgba(239,68,68,0.08)', border: '1px solid #fecaca', marginBottom: 40 },
-  deleteBtn:     { background: '#fff', border: '1.5px solid #ef4444', borderRadius: 12, padding: '10px 22px', color: '#ef4444', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', fontFamily: 'inherit' },
-};
+function SkillPicker({ allSkills, selectedIds, onChange }) {
+  const [search, setSearch] = useState('');
+  const [open, setOpen]     = useState(false);
+
+  const selectedSkills = allSkills.filter(s => selectedIds.includes(s.id));
+  const filtered       = allSkills.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) && !selectedIds.includes(s.id)
+  );
+
+  const add    = (id) => onChange([...selectedIds, id]);
+  const remove = (id) => onChange(selectedIds.filter(i => i !== id));
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, minHeight: 32 }}>
+        {selectedSkills.map(s => (
+          <SkillTag key={s.id} name={s.name} removable onRemove={() => remove(s.id)} />
+        ))}
+        {selectedSkills.length === 0 && <span style={{ fontSize: 12, color: 'var(--muted)' }}>No skills selected yet</span>}
+      </div>
+      <div style={{ position: 'relative' }}>
+        <input
+          className="form-input"
+          placeholder="Search and add skills..."
+          value={search}
+          onChange={e => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
+        />
+        {open && filtered.length > 0 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+            background: 'var(--white)', border: '1px solid var(--border)',
+            borderRadius: '0 0 8px 8px', maxHeight: 180, overflowY: 'auto',
+            boxShadow: 'var(--shadow)',
+          }}>
+            {filtered.slice(0, 20).map(s => (
+              <div key={s.id}
+                onMouseDown={() => { add(s.id); setSearch(''); }}
+                style={{ padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text)', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                {s.name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function EditProfilePage({ userId, currentUser, onNavigate, onLogout, onBack }) {
+  const toast = useToast();
+
+  const [profileData, setProfileData] = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+
+  // Form state
+  const [form, setForm]         = useState({});
+  const [skillIds, setSkillIds] = useState([]);
+
+  // Email change flow
+  const [newEmail, setNewEmail]         = useState('');
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [otpSent, setOtpSent]           = useState(false);
+  const [otp, setOtp]                   = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  // Password change
+  const [pwForm, setPwForm]   = useState({ current_password: '', new_password: '', confirm: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+
+  // Delete account
+  const [showDelete, setShowDelete]     = useState(false);
+  const [deletePass, setDeletePass]     = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  useEffect(() => {
+    getEditProfile(userId)
+      .then(res => {
+        const d = res.data;
+        setProfileData(d);
+        setForm({
+          name:              d.user.name || '',
+          email:             d.user.email || '',
+          bio:               d.user.bio || '',
+          profile_image:     d.user.profile_image || '',
+          experience_level:  d.user.experience_level || 'Beginner',
+          primary_domain_id: d.user.primary_domain_id || '',
+          github_url:        d.user.github_url || '',
+          linkedin_url:      d.user.linkedin_url || '',
+          portfolio_url:     d.user.portfolio_url || '',
+          whatsapp_number:   d.user.whatsapp_number || '',
+        });
+        setSkillIds(d.user_skills.map(s => s.id));
+      })
+      .catch(() => toast('Failed to load profile', 'error'))
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await updateProfile({ action: 'save', user_id: userId, ...form, skill_ids: skillIds });
+      if (res.data.success) {
+        toast('Profile saved successfully! ✅', 'success');
+      } else if (res.data.email_changed) {
+        toast('Email changed — please verify via OTP', 'info');
+        setShowEmailForm(true);
+      } else {
+        toast(res.data.error || 'Failed to save', 'error');
+      }
+    } catch (e) {
+      const msg = e.response?.data?.error || 'Failed to save profile';
+      if (msg.includes('email') || msg.includes('Email')) setShowEmailForm(true);
+      else toast(msg, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    setEmailLoading(true);
+    try {
+      await sendEmailOtp({ user_id: userId, ...form, email: newEmail, skill_ids: skillIds });
+      setOtpSent(true);
+      toast(`OTP sent to ${newEmail}`, 'success');
+    } catch (e) {
+      toast(e.response?.data?.error || 'Failed to send OTP', 'error');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setEmailLoading(true);
+    try {
+      const res = await verifyEmailOtp({ user_id: userId, ...form, email: newEmail, otp, skill_ids: skillIds });
+      if (res.data.success) {
+        toast('Email updated successfully! ✅', 'success');
+        set('email', newEmail);
+        setShowEmailForm(false);
+        setOtpSent(false);
+        setOtp('');
+      } else {
+        toast(res.data.error || 'Invalid OTP', 'error');
+      }
+    } catch (e) {
+      toast(e.response?.data?.error || 'Invalid OTP', 'error');
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (pwForm.new_password !== pwForm.confirm) { toast('Passwords do not match', 'error'); return; }
+    if (pwForm.new_password.length < 6) { toast('Password must be at least 6 characters', 'error'); return; }
+    setPwLoading(true);
+    try {
+      const body = { user_id: userId, new_password: pwForm.new_password };
+      if (!currentUser?.is_google_user) body.current_password = pwForm.current_password;
+      const res = await changePassword(body);
+      if (res.data.success) {
+        toast('Password updated! ✅', 'success');
+        setPwForm({ current_password: '', new_password: '', confirm: '' });
+      } else {
+        toast(res.data.error || 'Failed to update password', 'error');
+      }
+    } catch (e) {
+      toast(e.response?.data?.error || 'Failed to update password', 'error');
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      const body = { user_id: userId };
+      if (!currentUser?.is_google_user) body.password = deletePass;
+      const res = await deleteAccount(body);
+      if (res.data.success) window.location.href = '/';
+      else toast(res.data.error || 'Failed to delete account', 'error');
+    } catch (e) {
+      toast(e.response?.data?.error || 'Failed to delete account', 'error');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+  const levelColors = { Beginner: 'var(--success)', Intermediate: 'var(--warning)', Advanced: 'var(--danger)' };
+
+  return (
+    <div className="app-layout">
+      <Sidebar currentPage="profile" currentUser={currentUser} onNavigate={onNavigate} onLogout={() => {}} />
+      <main className="main-content page-enter">
+
+        <div className="page-header">
+          <div>
+            <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              ← Back
+            </button>
+            <h1 style={{ fontSize: 24 }}>Edit Profile</h1>
+          </div>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? '⏳ Saving...' : '💾 Save Changes'}
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {[1,2,3].map(i => <div key={i} className="card"><SkeletonBox height={100} /></div>)}
+          </div>
+        ) : (
+          <div style={{ maxWidth: 720 }}>
+
+            {/* Personal Info */}
+            <Section title="👤 Personal Information">
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Full Name *</label>
+                  <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="Your full name" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Profile Image URL</label>
+                  <input className="form-input" value={form.profile_image} onChange={e => set('profile_image', e.target.value)} placeholder="https://..." />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Bio</label>
+                <textarea className="form-input" value={form.bio} onChange={e => set('bio', e.target.value)} placeholder="Tell others about yourself..." style={{ minHeight: 80 }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Domain / Specialization</label>
+                <select className="form-input" value={form.primary_domain_id} onChange={e => set('primary_domain_id', e.target.value)}>
+                  <option value="">Select domain...</option>
+                  {profileData?.domains?.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Experience Level</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {LEVELS.map(lvl => (
+                    <button key={lvl} type="button" onClick={() => set('experience_level', lvl)} style={{
+                      padding: '8px 18px', borderRadius: 20,
+                      border: `2px solid ${form.experience_level === lvl ? levelColors[lvl] : 'var(--border)'}`,
+                      background: form.experience_level === lvl ? `${levelColors[lvl]}15` : 'var(--surface)',
+                      color: form.experience_level === lvl ? levelColors[lvl] : 'var(--muted)',
+                      fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.2s',
+                    }}>
+                      {lvl === 'Beginner' ? '🟢' : lvl === 'Intermediate' ? '🟡' : '🔴'} {lvl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+
+            {/* Skills */}
+            <Section title="🛠 Skills">
+              <SkillPicker
+                allSkills={profileData?.all_skills || []}
+                selectedIds={skillIds}
+                onChange={setSkillIds}
+              />
+            </Section>
+
+            {/* Social Links */}
+            <Section title="🔗 Social Links">
+              <div className="grid-2">
+                {[
+                  { key: 'github_url',      label: 'GitHub URL',      icon: '🐙', placeholder: 'https://github.com/...' },
+                  { key: 'linkedin_url',    label: 'LinkedIn URL',    icon: '💼', placeholder: 'https://linkedin.com/in/...' },
+                  { key: 'portfolio_url',   label: 'Portfolio URL',   icon: '🌐', placeholder: 'https://yoursite.com' },
+                  { key: 'whatsapp_number', label: 'WhatsApp Number', icon: '💬', placeholder: '+91XXXXXXXXXX' },
+                ].map(field => (
+                  <div key={field.key} className="form-group">
+                    <label className="form-label">{field.icon} {field.label}</label>
+                    <input className="form-input" value={form[field.key]} onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder} />
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            {/* Email */}
+            <Section title="📧 Email Address">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: showEmailForm ? 16 : 0 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--brown)' }}>{form.email}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Current email address</div>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowEmailForm(!showEmailForm)}>
+                  Change Email
+                </button>
+              </div>
+              {showEmailForm && (
+                <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: 8, marginTop: 12 }}>
+                  {!otpSent ? (
+                    <>
+                      <div className="form-group" style={{ marginBottom: 12 }}>
+                        <label className="form-label">New Email Address</label>
+                        <input className="form-input" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="new@email.com" />
+                      </div>
+                      <button className="btn btn-primary btn-sm" onClick={handleSendOtp} disabled={emailLoading || !newEmail}>
+                        {emailLoading ? '⏳ Sending...' : '📤 Send OTP'}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>OTP sent to <strong>{newEmail}</strong></p>
+                      <div className="form-group" style={{ marginBottom: 12 }}>
+                        <label className="form-label">Enter OTP</label>
+                        <input className="form-input" value={otp} onChange={e => setOtp(e.target.value)} placeholder="000000" maxLength={6} style={{ letterSpacing: 8, textAlign: 'center', fontSize: 20 }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-primary btn-sm" onClick={handleVerifyOtp} disabled={emailLoading || otp.length < 6}>
+                          {emailLoading ? '⏳ Verifying...' : '✅ Verify OTP'}
+                        </button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => { setOtpSent(false); setOtp(''); }}>
+                          Resend
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </Section>
+
+            {/* Change Password */}
+            <Section title="🔒 Change Password">
+              {!currentUser?.is_google_user && (
+                <div className="form-group">
+                  <label className="form-label">Current Password</label>
+                  <input className="form-input" type="password" value={pwForm.current_password} onChange={e => setPwForm(f => ({ ...f, current_password: e.target.value }))} placeholder="Current password" />
+                </div>
+              )}
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">New Password</label>
+                  <input className="form-input" type="password" value={pwForm.new_password} onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))} placeholder="New password" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Confirm Password</label>
+                  <input className="form-input" type="password" value={pwForm.confirm} onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))} placeholder="Repeat new password" />
+                </div>
+              </div>
+              <button className="btn btn-secondary" onClick={handlePasswordChange} disabled={pwLoading}>
+                {pwLoading ? '⏳ Updating...' : '🔑 Update Password'}
+              </button>
+            </Section>
+
+            {/* Danger Zone */}
+            <div className="card" style={{ border: '1px solid rgba(200,64,64,0.4)', background: 'rgba(200,64,64,0.03)' }}>
+              <h3 style={{ fontSize: 15, color: 'var(--danger)', marginBottom: 8 }}>⚠️ Danger Zone</h3>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
+                Permanently delete your account and all your data. This action cannot be undone.
+              </p>
+              {!showDelete ? (
+                <button className="btn btn-danger" onClick={() => setShowDelete(true)}>🗑️ Delete Account</button>
+              ) : (
+                <div style={{ padding: '14px', background: 'var(--danger-bg)', borderRadius: 8 }}>
+                  <p style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600, marginBottom: 12 }}>
+                    Are you absolutely sure? This cannot be undone.
+                  </p>
+                  {!currentUser?.is_google_user && (
+                    <div className="form-group" style={{ marginBottom: 12 }}>
+                      <label className="form-label">Enter Password to Confirm</label>
+                      <input className="form-input" type="password" value={deletePass} onChange={e => setDeletePass(e.target.value)} placeholder="Your password" />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-danger" onClick={handleDeleteAccount} disabled={deleteLoading}>
+                      {deleteLoading ? '⏳ Deleting...' : '🗑️ Yes, Delete My Account'}
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => { setShowDelete(false); setDeletePass(''); }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

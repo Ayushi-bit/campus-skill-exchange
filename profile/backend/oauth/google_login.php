@@ -3,7 +3,7 @@
 $env = parse_ini_file(__DIR__ . '/../.env');
 
 $client_id    = $env['CLIENT_ID'];
-$redirect_uri = "http://localhost/backend/oauth/google_callback.php";
+$redirect_uri = "http://localhost/Campus-Skill-Exchange-Platform/profile/backend/oauth/google_callback.php";
 
 $params = http_build_query([
     'client_id'     => $client_id,

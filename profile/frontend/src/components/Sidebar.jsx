@@ -1,125 +1,177 @@
-// ============================================================
-//  SIDEBAR  — Full navigation with active page support
-//  File: src/components/Sidebar.jsx
-// ============================================================
-
 import React from 'react';
+import Avatar from './Avatar';
+import NotificationBell from './NotificationBell';
 
-const navItems = [
-  { label: 'Dashboard',       icon: '⊞',  page: 'dashboard'    },
-  { label: 'Browse Projects', icon: '🔍', page: 'browse'        },
-  { label: 'Post Project',    icon: '✦',  page: 'post'          },
-  { label: 'Applications',    icon: '📨', page: 'applications'  },
-  { label: 'My Projects',     icon: '📁', page: 'myprojects'    },
-  { label: 'Profile',         icon: '👤', page: 'profile'       },
-  { label: 'Notifications',   icon: '🔔', page: 'notifications' },
+const NAV_ITEMS = [
+  { id: 'dashboard',    icon: '🏠', label: 'Dashboard' },
+  { id: 'profile',      icon: '👤', label: 'My Profile' },
+  { id: 'browse',       icon: '🔍', label: 'Browse Projects' },
+  { id: 'post',         icon: '➕', label: 'Post Project' },
+  { id: 'myprojects',   icon: '📋', label: 'My Projects' },
+  { id: 'applications', icon: '📩', label: 'Applications' },
 ];
 
-export default function Sidebar({ open, setOpen, activePage, onNavigate, onLogout, currentUser }) {
+export default function Sidebar({ currentPage, currentUser, onNavigate, onLogout }) {
   return (
-    <aside style={{
-      width: open ? 220 : 68,
-      background: '#fff',
-      borderRight: '1px solid #ede9fe',
-      padding: '28px 12px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 6,
-      transition: 'width 0.25s',
-      overflow: 'hidden',
-      flexShrink: 0,
-      position: 'sticky',
-      top: 0,
-      height: '100vh',
-      zIndex: 10,
-    }}>
-
-      {/* Logo */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '0 6px 20px',
-        borderBottom: '1px solid #f1f0ff', marginBottom: 8,
+    <>
+      {/* Desktop sidebar */}
+      <aside style={{
+        width: 'var(--sidebar-w)',
+        height: '100vh',
+        position: 'fixed',
+        top: 0, left: 0,
+        background: 'var(--white)',
+        borderRight: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 100,
+        boxShadow: '2px 0 12px rgba(107,58,31,0.06)',
       }}>
+        {/* Logo */}
         <div style={{
-          width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0,
-        }}>S</div>
-        {open && (
-          <span style={{
-            fontFamily: "'Sora', sans-serif",
-            fontWeight: 800, fontSize: 13,
-            color: '#4f46e5', whiteSpace: 'nowrap',
-          }}>SkillExchange</span>
-        )}
-      </div>
-
-      {/* Nav Items */}
-      {navItems.map((item) => {
-        const isActive = activePage === item.page;
-        return (
-          <div
-            key={item.label}
-            className={`nav-item${isActive ? ' active' : ''}`}
-            title={item.label}
-            onClick={() => onNavigate && onNavigate(item.page)}
-          >
-            <span style={{ fontSize: 18, flexShrink: 0 }}>{item.icon}</span>
-            {open && <span style={{ whiteSpace: 'nowrap' }}>{item.label}</span>}
+          padding: '20px 18px 16px',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36,
+              background: 'linear-gradient(135deg, var(--orange), var(--skin))',
+              borderRadius: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontSize: 16, fontWeight: 700,
+              fontFamily: "'Playfair Display', serif",
+              flexShrink: 0,
+            }}>C</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--brown)', fontFamily: "'Playfair Display', serif", lineHeight: 1.2 }}>
+                Campus Skill
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
+                Exchange
+              </div>
+            </div>
           </div>
-        );
-      })}
+        </div>
 
-      {/* User info + Logout */}
-      <div style={{ marginTop: 'auto' }}>
+        {/* User info */}
+        <div style={{
+          padding: '14px 18px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <Avatar
+            name={currentUser?.name || ''}
+            image={currentUser?.profile_image || ''}
+            size={36}
+          />
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--brown)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {currentUser?.name || 'User'}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: "'DM Mono', monospace" }}>
+              {currentUser?.primary_domain || 'Student'}
+            </div>
+          </div>
+        </div>
 
-        {/* User avatar strip */}
-        {currentUser && open && (
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '10px 10px', overflowY: 'auto' }}>
+          {NAV_ITEMS.map(item => {
+            const isActive = currentPage === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate(item.id)}
+                style={{
+                  width: '100%',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 12px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: isActive ? 'rgba(200,115,58,0.1)' : 'transparent',
+                  color: isActive ? 'var(--orange)' : 'var(--muted)',
+                  fontWeight: isActive ? 700 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  borderLeft: isActive ? '3px solid var(--orange)' : '3px solid transparent',
+                  marginBottom: 2,
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
+
+          {/* Notifications */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 12px', marginBottom: 4,
-            background: '#f5f4fe', borderRadius: 12,
-            border: '1px solid #ede9fe',
+            padding: '6px 12px',
+            borderLeft: '3px solid transparent',
           }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: '50%',
-              background: 'linear-gradient(135deg,#6366f1,#7c3aed)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0,
-            }}>
-              {currentUser.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2)}
-            </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUser.name}
-              </div>
-              <div style={{ fontSize: 10, color: '#9ca3af' }}>{currentUser.primary_domain}</div>
+            <span style={{ fontSize: 16, width: 20, textAlign: 'center', color: 'var(--muted)' }}>🔔</span>
+            <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>Notifications</span>
+            <div style={{ marginLeft: 'auto' }}>
+              <NotificationBell />
             </div>
           </div>
-        )}
+        </nav>
 
-        <div
-          className="nav-item"
-          title="Logout"
-          style={{ color: '#ef4444' }}
-          onClick={() => onLogout && onLogout()}
-        >
-          <span style={{ fontSize: 18 }}>⏻</span>
-          {open && <span style={{ whiteSpace: 'nowrap' }}>Logout</span>}
+        {/* Logout */}
+        <div style={{ padding: '12px 10px', borderTop: '1px solid var(--border)' }}>
+          <button
+            onClick={onLogout}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px',
+              borderRadius: 8, border: 'none',
+              background: 'transparent',
+              color: 'var(--danger)',
+              fontWeight: 600, fontSize: 13,
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-bg)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <span style={{ fontSize: 16 }}>🚪</span> Logout
+          </button>
         </div>
+      </aside>
 
-        {/* Collapse toggle */}
-        <div
-          className="nav-item"
-          onClick={() => setOpen(!open)}
-          title="Toggle Sidebar"
-          style={{ marginTop: 4 }}
-        >
-          <span style={{ fontSize: 18 }}>{open ? '◀' : '▶'}</span>
-          {open && <span>Collapse</span>}
-        </div>
-      </div>
-    </aside>
+      {/* Mobile bottom nav */}
+      <nav style={{
+        display: 'none',
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        background: 'var(--white)',
+        borderTop: '1px solid var(--border)',
+        padding: '8px 4px',
+        zIndex: 100,
+        justifyContent: 'space-around',
+      }} className="mobile-nav">
+        {NAV_ITEMS.slice(0, 5).map(item => {
+          const isActive = currentPage === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => onNavigate(item.id)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                padding: '4px 8px',
+                color: isActive ? 'var(--orange)' : 'var(--muted)',
+                fontSize: 10, fontWeight: 600,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              {item.label.split(' ')[0]}
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 }

@@ -1,13 +1,4 @@
 <?php
-// ============================================================
-//  SUBMIT RATING API
-//  File: backend/api/submit_rating.php
-//  POST { project_id, receiver_id, rating, feedback, user_id }
-//  Only allowed when project is completed
-//  Only team members can rate each other
-//  One rating per giver+receiver+project
-// ============================================================
-
 require_once 'bootstrap.php';
 require_once 'config.php';
 
@@ -45,7 +36,7 @@ if ($giver_id === $receiver_id) {
 $conn = getConnection();
 
 // Check project is completed
-$stmt = $conn->prepare("SELECT status FROM projects WHERE id = ?");
+$stmt = $conn->prepare("SELECT status, title FROM projects WHERE id = ?");
 $stmt->bind_param("i", $project_id);
 $stmt->execute();
 $project = $stmt->get_result()->fetch_assoc();
@@ -58,7 +49,7 @@ if (!$project || $project['status'] !== 'completed') {
     exit();
 }
 
-// Check giver is a member of this project
+// Check giver is a member
 $stmt = $conn->prepare("SELECT id FROM project_members WHERE project_id = ? AND user_id = ?");
 $stmt->bind_param("ii", $project_id, $giver_id);
 $stmt->execute();
@@ -66,13 +57,11 @@ $stmt->store_result();
 if ($stmt->num_rows === 0) {
     http_response_code(403);
     echo json_encode(['error' => 'You are not a member of this project']);
-    $stmt->close();
-    $conn->close();
-    exit();
+    $stmt->close(); $conn->close(); exit();
 }
 $stmt->close();
 
-// Check receiver is also a member of this project
+// Check receiver is a member
 $stmt = $conn->prepare("SELECT id FROM project_members WHERE project_id = ? AND user_id = ?");
 $stmt->bind_param("ii", $project_id, $receiver_id);
 $stmt->execute();
@@ -80,9 +69,7 @@ $stmt->store_result();
 if ($stmt->num_rows === 0) {
     http_response_code(400);
     echo json_encode(['error' => 'Receiver is not a member of this project']);
-    $stmt->close();
-    $conn->close();
-    exit();
+    $stmt->close(); $conn->close(); exit();
 }
 $stmt->close();
 
@@ -94,9 +81,7 @@ $stmt->store_result();
 if ($stmt->num_rows > 0) {
     http_response_code(409);
     echo json_encode(['error' => 'You have already rated this person for this project']);
-    $stmt->close();
-    $conn->close();
-    exit();
+    $stmt->close(); $conn->close(); exit();
 }
 $stmt->close();
 
@@ -106,27 +91,54 @@ $stmt->bind_param("iiiis", $project_id, $giver_id, $receiver_id, $rating, $feedb
 $stmt->execute();
 $stmt->close();
 
-// Recalculate receiver's avg_rating
+// Update receiver avg_rating
 $stmt = $conn->prepare("UPDATE users SET avg_rating = (SELECT ROUND(AVG(rating), 1) FROM ratings WHERE receiver_id = ?) WHERE id = ?");
 $stmt->bind_param("ii", $receiver_id, $receiver_id);
 $stmt->execute();
 $stmt->close();
 
-// Send notification to receiver
+// Get giver name
 $stmt = $conn->prepare("SELECT name FROM users WHERE id = ?");
 $stmt->bind_param("i", $giver_id);
 $stmt->execute();
 $giver = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-$notif_msg = "{$giver['name']} gave you a {$rating}-star rating!";
-$notif_type = 'new_rating';
-$stmt = $conn->prepare("INSERT INTO notifications (user_id, type, message, is_read) VALUES (?, ?, ?, 0)");
-$stmt->bind_param("iss", $receiver_id, $notif_type, $notif_msg);
+// Get receiver email + name
+$stmt = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
+$stmt->bind_param("i", $receiver_id);
+$stmt->execute();
+$receiver = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+// Stars string
+$stars = str_repeat('⭐', $rating);
+
+// Notification message
+$notif_msg = "{$giver['name']} gave you a {$rating}-star rating {$stars} on \"{$project['title']}\".";
+if ($feedback) {
+    $notif_msg .= " They said: \"{$feedback}\"";
+}
+
+// Save notification in DB
+$stmt = $conn->prepare("INSERT INTO notifications (user_id, type, message, is_read) VALUES (?, 'new_rating', ?, 0)");
+$stmt->bind_param("is", $receiver_id, $notif_msg);
 $stmt->execute();
 $stmt->close();
 
 $conn->close();
 
-echo json_encode(['success' => true, 'message' => 'Rating submitted successfully']);
+// Send email notification (non-blocking — won't crash if email fails)
+try {
+    require_once __DIR__ . '/../notifications/send_email_notification.php';
+    sendEmailNotification($app['applicant_email'], $app['applicant_name'], $notif_type, $notif_msg);
+} catch (Exception $e) {
+    error_log("Email failed: " . $e->getMessage());
+}
+
+echo json_encode([
+    'success'    => true,
+    'message'    => "Application {$new_status} successfully",
+    'new_status' => $new_status,
+]);
 ?>

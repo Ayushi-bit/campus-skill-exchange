@@ -1,11 +1,4 @@
 <?php
-// ============================================================
-//  MANAGE APPLICATION API
-//  File: backend/api/manage_application.php
-//  POST { application_id, action: 'accept'|'reject', user_id }
-//  Only project owner can accept/reject
-// ============================================================
-
 require_once 'bootstrap.php';
 require_once 'config.php';
 
@@ -40,11 +33,14 @@ if ($user_id !== (int)$_SESSION['user_id']) {
 
 $conn = getConnection();
 
-// Verify the logged-in user owns the project this application is for
+// Get application details
 $stmt = $conn->prepare("
-    SELECT pa.id, pa.applicant_id, pa.status, p.posted_by, p.id AS project_id, p.title
+    SELECT pa.id, pa.applicant_id, pa.status,
+           p.posted_by, p.id AS project_id, p.title,
+           u.name AS applicant_name, u.email AS applicant_email
     FROM project_applications pa
     JOIN projects p ON p.id = pa.project_id
+    JOIN users u ON u.id = pa.applicant_id
     WHERE pa.id = ?
 ");
 $stmt->bind_param("i", $application_id);
@@ -83,33 +79,37 @@ $stmt->close();
 
 // If accepted → add to project_members
 if ($action === 'accept') {
-    $stmt = $conn->prepare("
-        INSERT IGNORE INTO project_members (project_id, user_id, role)
-        VALUES (?, ?, 'member')
-    ");
+    $stmt = $conn->prepare("INSERT IGNORE INTO project_members (project_id, user_id, role) VALUES (?, ?, 'member')");
     $stmt->bind_param("ii", $app['project_id'], $app['applicant_id']);
     $stmt->execute();
     $stmt->close();
 }
 
-// Add notification for applicant
+// Notification message
 $notif_type = $action === 'accept' ? 'application_accepted' : 'application_rejected';
 $notif_msg  = $action === 'accept'
-    ? "Your application to \"{$app['title']}\" was accepted! 🎉"
-    : "Your application to \"{$app['title']}\" was not accepted this time.";
+    ? "Your application to \"{$app['title']}\" was accepted! 🎉 Welcome to the team!"
+    : "Your application to \"{$app['title']}\" was not accepted this time. Keep exploring other projects!";
 
-$stmt = $conn->prepare("
-    INSERT INTO notifications (user_id, type, message, is_read)
-    VALUES (?, ?, ?, 0)
-");
+// Save notification in DB
+$stmt = $conn->prepare("INSERT INTO notifications (user_id, type, message, is_read) VALUES (?, ?, ?, 0)");
 $stmt->bind_param("iss", $app['applicant_id'], $notif_type, $notif_msg);
 $stmt->execute();
 $stmt->close();
+
 $conn->close();
 
+// Send email notification (non-blocking — won't crash if email fails)
+try {
+    require_once __DIR__ . '/../notifications/send_email_notification.php';
+    sendEmailNotification($app['applicant_email'], $app['applicant_name'], $notif_type, $notif_msg);
+} catch (Exception $e) {
+    error_log("Email failed: " . $e->getMessage());
+}
+
 echo json_encode([
-    'success' => true,
-    'message' => "Application {$new_status} successfully",
+    'success'    => true,
+    'message'    => "Application {$new_status} successfully",
     'new_status' => $new_status,
 ]);
 ?>

@@ -1,26 +1,195 @@
-// ============================================================
-//  MY PROJECTS PAGE
-//  File: src/components/MyProjectsPage.jsx
-//  Shows owned projects + projects user is a member of
-// ============================================================
-
 import React, { useEffect, useState } from 'react';
-import { getMyProjects } from '../services/api';
 import Sidebar from './Sidebar';
+import StatusBadge from './StatusBadge';
+import SkillTag from './SkillTag';
+import { SkeletonCard } from './LoadingSkeleton';
+import { getMyProjects, updateProject } from '../services/api';
+import { useToast } from './Toast';
 
-const statusStyles = {
-  open:        { bg: '#e8f5e9', color: '#2e7d32',  label: 'Open'        },
-  in_progress: { bg: '#fff8e1', color: '#f57f17',  label: 'In Progress' },
-  completed:   { bg: '#e3f2fd', color: '#1565c0',  label: 'Completed'   },
-  closed:      { bg: '#fef2f2', color: '#dc2626',  label: 'Closed'      },
-};
+const STATUS_OPTIONS = ['open', 'in_progress', 'completed', 'closed'];
+const STATUS_LABELS  = { open: '🟢 Open', in_progress: '🔵 In Progress', completed: '✅ Completed', closed: '🔒 Closed' };
+const FILTER_TABS    = ['All', 'Open', 'In Progress', 'Completed', 'Closed'];
+
+function OwnedCard({ project, userId, onNavigate, onStatusChange }) {
+  const toast = useToast();
+  const [showStatus, setShowStatus] = useState(false);
+  const [loading, setLoading]       = useState('');
+
+  const handleStatusChange = async (newStatus) => {
+    setLoading(newStatus);
+    try {
+      const res = await updateProject({ action: 'update_status', user_id: userId, project_id: project.id, status: newStatus });
+      if (res.data.success) {
+        toast(`Status updated to "${newStatus}"! ✅`, 'success');
+        onStatusChange(project.id, newStatus);
+        setShowStatus(false);
+      } else {
+        toast(res.data.error || 'Failed to update status', 'error');
+      }
+    } catch (e) {
+      toast(e.response?.data?.error || 'Failed to update status', 'error');
+    } finally {
+      setLoading('');
+    }
+  };
+
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, transition: 'border-color 0.2s' }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--skin)'}
+      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+    >
+      {/* Title + status */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown)', lineHeight: 1.3, flex: 1 }}>
+          {project.title}
+        </h3>
+        <StatusBadge status={project.status} />
+      </div>
+
+      {/* Meta */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--orange-dim)', color: 'var(--orange)', fontSize: 11, fontWeight: 600 }}>
+          {project.domain}
+        </span>
+        <StatusBadge status={project.experience_level} />
+        <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: "'DM Mono', monospace", padding: '3px 0' }}>
+          📅 {project.created_at}
+        </span>
+      </div>
+
+      {/* Description */}
+      <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {project.description}
+      </p>
+
+      {/* Skills */}
+      {project.skills?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {project.skills.slice(0, 4).map(s => <SkillTag key={s} name={s} small />)}
+          {project.skills.length > 4 && <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center' }}>+{project.skills.length - 4}</span>}
+        </div>
+      )}
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 16, paddingTop: 8, borderTop: '1px solid var(--surface)' }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>👥 {project.member_count}/{project.max_members} members</span>
+        {project.pending_count > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--warning)', fontWeight: 700 }}>
+            ⏳ {project.pending_count} pending
+          </span>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => onNavigate('project', project.id)}
+        >
+          👁 View
+        </button>
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => onNavigate('applications')}
+        >
+          📩 Applications
+          {project.pending_count > 0 && (
+            <span style={{ marginLeft: 4, background: 'var(--warning)', color: '#fff', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>
+              {project.pending_count}
+            </span>
+          )}
+        </button>
+
+        {/* Status change dropdown */}
+        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setShowStatus(s => !s)}
+          >
+            🔄 Change Status
+          </button>
+          {showStatus && (
+            <div style={{
+              position: 'absolute', right: 0, top: '100%', marginTop: 4,
+              background: 'var(--white)', border: '1px solid var(--border)',
+              borderRadius: 8, boxShadow: 'var(--shadow)', zIndex: 10,
+              minWidth: 160, overflow: 'hidden',
+            }}>
+              {STATUS_OPTIONS.map(s => (
+                <button
+                  key={s}
+                  onClick={() => handleStatusChange(s)}
+                  disabled={project.status === s || !!loading}
+                  style={{
+                    width: '100%', padding: '9px 14px',
+                    background: project.status === s ? 'var(--surface)' : 'transparent',
+                    border: 'none', cursor: project.status === s ? 'default' : 'pointer',
+                    textAlign: 'left', fontSize: 13,
+                    color: project.status === s ? 'var(--orange)' : 'var(--text)',
+                    fontWeight: project.status === s ? 700 : 400,
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (project.status !== s) e.currentTarget.style.background = 'var(--surface)'; }}
+                  onMouseLeave={e => { if (project.status !== s) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {loading === s ? '⏳ ' : ''}{STATUS_LABELS[s]}
+                  {project.status === s && ' ✓'}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MemberOfCard({ project, onNavigate }) {
+  return (
+    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, transition: 'all 0.2s', cursor: 'pointer' }}
+      onClick={() => onNavigate('project', project.id)}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--skin)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--brown)', lineHeight: 1.3, flex: 1 }}>{project.title}</h3>
+        <StatusBadge status={project.status} />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ padding: '3px 10px', borderRadius: 20, background: 'var(--orange-dim)', color: 'var(--orange)', fontSize: 11, fontWeight: 600 }}>
+          {project.domain}
+        </span>
+        <StatusBadge status={project.experience_level} />
+      </div>
+
+      <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6, margin: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {project.description}
+      </p>
+
+      {project.skills?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {project.skills.slice(0, 4).map(s => <SkillTag key={s} name={s} small />)}
+          {project.skills.length > 4 && <span style={{ fontSize: 11, color: 'var(--muted)' }}>+{project.skills.length - 4}</span>}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--surface)' }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          By <span style={{ color: 'var(--brown)', fontWeight: 600 }}>{project.owner_name}</span>
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>👥 {project.member_count}/{project.max_members}</span>
+      </div>
+    </div>
+  );
+}
 
 export default function MyProjectsPage({ userId, currentUser, onNavigate, onLogout }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [owned, setOwned]             = useState([]);
-  const [memberOf, setMemberOf]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [activeTab, setActiveTab]     = useState('owned');
+  const [owned, setOwned]       = useState([]);
+  const [memberOf, setMemberOf] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [filter, setFilter]     = useState('All');
+  const [activeTab, setActiveTab] = useState('owned');
 
   useEffect(() => {
     getMyProjects(userId)
@@ -32,132 +201,130 @@ export default function MyProjectsPage({ userId, currentUser, onNavigate, onLogo
       .finally(() => setLoading(false));
   }, [userId]);
 
-  const totalPending = owned.reduce((sum, p) => sum + (p.pending_count || 0), 0);
+  const handleStatusChange = (projectId, newStatus) => {
+    setOwned(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
+  };
+
+  const filterProjects = (projects) => {
+    if (filter === 'All') return projects;
+    return projects.filter(p => {
+      const s = p.status?.toLowerCase().replace(/_/g, ' ');
+      return s === filter.toLowerCase();
+    });
+  };
+
+  const filteredOwned    = filterProjects(owned);
+  const filteredMemberOf = filterProjects(memberOf);
+
+  const totalOwned    = owned.length;
+  const totalMemberOf = memberOf.length;
+  const totalPending  = owned.reduce((sum, p) => sum + (p.pending_count || 0), 0);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f8f7ff' }}>
-      <Sidebar
-        open={sidebarOpen}
-        setOpen={setSidebarOpen}
-        activePage="myprojects"
-        onNavigate={onNavigate}
-        onLogout={onLogout}
-        currentUser={currentUser}
-      />
-
-      <main style={{ flex: 1, padding: '32px 28px', overflowY: 'auto' }}>
+    <div className="app-layout">
+      <Sidebar currentPage="myprojects" currentUser={currentUser} onNavigate={onNavigate} onLogout={onLogout} />
+      <main className="main-content page-enter">
 
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
+        <div className="page-header">
           <div>
-            <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 800, color: '#1e1b4b', margin: '0 0 6px' }}>
-              My Projects
-            </h1>
-            <p style={{ color: '#9ca3af', fontSize: 14, margin: 0 }}>
-              Projects you own and ones you're a team member of
-            </p>
+            <h1 style={{ fontSize: 26 }}>My Projects</h1>
+            <p>Manage your projects and track your collaborations</p>
           </div>
-          <button
-            onClick={() => onNavigate('post')}
-            style={{
-              background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
-              color: '#fff', border: 'none', borderRadius: 12,
-              padding: '10px 20px', fontWeight: 700, fontSize: 14,
-              cursor: 'pointer', fontFamily: 'inherit',
-              boxShadow: '0 4px 12px rgba(99,102,241,0.3)',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}
-          >
-            ✦ Post New Project
+          <button className="btn btn-primary" onClick={() => onNavigate('post')}>➕ Post a Project</button>
+        </div>
+
+        {/* Stats row */}
+        {!loading && (
+          <div style={{ display: 'flex', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
+            {[
+              { icon: '📁', label: 'Projects Owned', value: totalOwned, color: 'var(--orange)' },
+              { icon: '🤝', label: 'Collaborating On', value: totalMemberOf, color: '#3366cc' },
+              { icon: '⏳', label: 'Pending Applications', value: totalPending, color: 'var(--warning)' },
+            ].map(s => (
+              <div key={s.label} className="card" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+                  {s.icon}
+                </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--brown)', fontFamily: "'Playfair Display', serif" }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="tabs">
+          <button className={`tab-btn ${activeTab === 'owned' ? 'active' : ''}`} onClick={() => setActiveTab('owned')}>
+            📁 My Projects ({totalOwned})
+          </button>
+          <button className={`tab-btn ${activeTab === 'member' ? 'active' : ''}`} onClick={() => setActiveTab('member')}>
+            🤝 Collaborating ({totalMemberOf})
           </button>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-          {[
-            { key: 'owned',    label: 'Created',      count: owned.length,    badge: totalPending },
-            { key: 'member_of', label: 'Collaborations', count: memberOf.length, badge: 0 },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                padding: '9px 20px', borderRadius: 12, border: 'none',
-                cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 14,
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: activeTab === tab.key ? 'linear-gradient(135deg, #6366f1, #7c3aed)' : '#fff',
-                color: activeTab === tab.key ? '#fff' : '#6b7280',
-                boxShadow: activeTab === tab.key ? '0 4px 12px rgba(99,102,241,0.3)' : '0 1px 4px rgba(0,0,0,0.06)',
-                transition: 'all 0.2s',
-              }}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span style={{
-                  background: activeTab === tab.key ? 'rgba(255,255,255,0.3)' : '#ede9fe',
-                  color: activeTab === tab.key ? '#fff' : '#6366f1',
-                  borderRadius: 20, padding: '1px 8px', fontSize: 12, fontWeight: 700,
-                }}>
-                  {tab.count}
-                </span>
-              )}
-              {tab.badge > 0 && (
-                <span style={{
-                  background: '#ef4444', color: '#fff',
-                  borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
-                }}>
-                  {tab.badge} pending
-                </span>
-              )}
+        {/* Status filter pills */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+          {FILTER_TABS.map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              padding: '6px 16px', borderRadius: 20,
+              border: `2px solid ${filter === f ? 'var(--orange)' : 'var(--border)'}`,
+              background: filter === f ? 'var(--orange-dim)' : 'var(--white)',
+              color: filter === f ? 'var(--orange)' : 'var(--muted)',
+              fontWeight: filter === f ? 700 : 500,
+              fontSize: 12, cursor: 'pointer', transition: 'all 0.2s',
+            }}>
+              {f}
             </button>
           ))}
         </div>
 
+        {/* Content */}
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
-            <div style={{ width: 40, height: 40, border: '4px solid #ede9fe', borderTop: '4px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          </div>
+          <div className="grid-3">{[1,2,3,4,5,6].map(i => <SkeletonCard key={i} />)}</div>
         ) : activeTab === 'owned' ? (
-          owned.length === 0 ? (
-            <EmptyState
-              icon="📁"
-              title="No projects posted yet"
-              subtitle="Share your ideas and find collaborators"
-              action="Post Your First Project"
-              onAction={() => onNavigate('post')}
-            />
+          filteredOwned.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">{filter !== 'All' ? '🔍' : '📭'}</div>
+              <h3>{filter !== 'All' ? `No ${filter.toLowerCase()} projects` : 'No projects yet'}</h3>
+              <p>{filter !== 'All' ? 'Try a different filter' : "You haven't posted any projects yet."}</p>
+              {filter === 'All' && (
+                <button className="btn btn-primary btn-sm" onClick={() => onNavigate('post')}>
+                  ➕ Post Your First Project
+                </button>
+              )}
+            </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-              {owned.map(p => (
-                <ProjectCard
+            <div className="grid-3" style={{ alignItems: 'start' }}>
+              {filteredOwned.map(p => (
+                <OwnedCard
                   key={p.id}
                   project={p}
-                  isOwner={true}
-                  onView={() => onNavigate('project', p.id)}
+                  userId={userId}
                   onNavigate={onNavigate}
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </div>
           )
         ) : (
-          memberOf.length === 0 ? (
-            <EmptyState
-              icon="👥"
-              title="Not a member of any project yet"
-              subtitle="Apply to projects and get accepted to see them here"
-              action="Browse Projects"
-              onAction={() => onNavigate('browse')}
-            />
+          filteredMemberOf.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">{filter !== 'All' ? '🔍' : '🤝'}</div>
+              <h3>{filter !== 'All' ? `No ${filter.toLowerCase()} collaborations` : "Not collaborating yet"}</h3>
+              <p>{filter !== 'All' ? 'Try a different filter' : "Apply to projects to start collaborating with other students."}</p>
+              {filter === 'All' && (
+                <button className="btn btn-primary btn-sm" onClick={() => onNavigate('browse')}>
+                  🔍 Browse Projects
+                </button>
+              )}
+            </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
-              {memberOf.map(p => (
-                <ProjectCard
-                  key={p.id}
-                  project={p}
-                  isOwner={false}
-                  onView={() => onNavigate('project', p.id)}
-                />
+            <div className="grid-3" style={{ alignItems: 'start' }}>
+              {filteredMemberOf.map(p => (
+                <MemberOfCard key={p.id} project={p} onNavigate={onNavigate} />
               ))}
             </div>
           )
@@ -166,94 +333,3 @@ export default function MyProjectsPage({ userId, currentUser, onNavigate, onLogo
     </div>
   );
 }
-
-function ProjectCard({ project, isOwner, onView }) {
-  const sc = statusStyles[project.status] || { bg: '#f3f4f6', color: '#6b7280', label: project.status };
-
-  return (
-    <div
-      onClick={onView}
-      style={{
-        background: '#fff', borderRadius: 16, padding: '20px 22px',
-        border: '1px solid #ede9fe', cursor: 'pointer',
-        boxShadow: '0 2px 12px rgba(99,102,241,0.06)',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        display: 'flex', flexDirection: 'column', gap: 12,
-      }}
-      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(99,102,241,0.12)'; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(99,102,241,0.06)'; }}
-    >
-      {/* Title + Status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 15, color: '#1e1b4b', lineHeight: 1.4 }}>
-          {project.title}
-        </div>
-        <span style={{ ...pillStyle, background: sc.bg, color: sc.color, flexShrink: 0 }}>
-          {sc.label}
-        </span>
-      </div>
-
-      {/* Description */}
-      <p style={{ fontSize: 13, color: '#6b7280', margin: 0, lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-        {project.description}
-      </p>
-
-      {/* Meta */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ ...pillStyle, background: '#f5f4fe', color: '#6366f1' }}>📂 {project.domain}</span>
-        <span style={{ ...pillStyle, background: '#f1f0ff', color: '#7c3aed' }}>{project.experience_level}</span>
-        <span style={{ ...pillStyle, background: '#f9fafb', color: '#6b7280' }}>
-          👥 {project.member_count}/{project.max_members}
-        </span>
-      </div>
-
-      {/* Skills */}
-      {project.skills && project.skills.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-          {project.skills.slice(0, 4).map(sk => (
-            <span key={sk} style={{ ...pillStyle, background: '#eef2ff', color: '#4f46e5', fontSize: 11 }}>{sk}</span>
-          ))}
-          {project.skills.length > 4 && (
-            <span style={{ ...pillStyle, background: '#f3f4f6', color: '#9ca3af', fontSize: 11 }}>+{project.skills.length - 4} more</span>
-          )}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid #f5f4fe' }}>
-        <span style={{ fontSize: 12, color: '#d1d5db' }}>
-          {isOwner ? `Posted ${project.created_at}` : `Owner: ${project.owner_name}`}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isOwner && project.pending_count > 0 && (
-            <span style={{ background: '#fef3c7', color: '#d97706', borderRadius: 20, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
-              {project.pending_count} pending
-            </span>
-          )}
-          <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 600 }}>View →</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ icon, title, subtitle, action, onAction }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>{icon}</div>
-      <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: '#1e1b4b', marginBottom: 8 }}>{title}</div>
-      <div style={{ fontSize: 14, color: '#9ca3af', marginBottom: 24 }}>{subtitle}</div>
-      <button
-        onClick={onAction}
-        style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 12px rgba(99,102,241,0.3)' }}
-      >
-        {action}
-      </button>
-    </div>
-  );
-}
-
-const pillStyle = {
-  display: 'inline-block', padding: '3px 10px',
-  borderRadius: 20, fontSize: 12, fontWeight: 600,
-};
